@@ -75,9 +75,9 @@ crash on it, which is the fail-loud you want, but do not rely on that.
 
 ## What was verified
 
-With the public tree assembled at tag `v0.10.0` and every placeholder
+With the public tree assembled at tag `v0.11.0` and every placeholder
 substituted with test values (`<REGISTRY_PATH>=ghcr.io/evenfire-ai`,
-`<IMAGE_TAG>=v0.10.0`, `<BASE_DOMAIN>=example.com`, TEST-NET addresses for
+`<IMAGE_TAG>=v0.11.0`, `<BASE_DOMAIN>=example.com`, TEST-NET addresses for
 the CIDRs, `standard-rwo` for the StorageClass), `kubectl kustomize` rendered
 the overlay in both variants (252 objects without `../../base/ingress`, 261
 with), the public tree's `lint-networkpolicies.sh` and

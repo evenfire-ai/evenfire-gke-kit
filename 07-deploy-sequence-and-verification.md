@@ -103,7 +103,10 @@ hand-maintained list):
   ingress` (per-Host agents and `channel-reader-<host>` land here).
   `rollout status --timeout=300s` each; `host-context-controller` gets
   `1500s` because it answers 503 on `/ready` until its first full fleet
-  reconciliation.
+  reconciliation. A Deployment HCC holds at `replicas: 0` (a suspended
+  stateless Host, a `channel-reader-<host>` with no channel) has nothing to
+  wait for and passes `rollout status` at once; one that is waking (0 -> 1)
+  during the gate is waited for like any other.
 - **Non-gating** = Deployments in `mcp-server` (third-party MCP servers) and
   `sandbox-recipes` (WRC per-recipe workloads) that the render does not own:
   checked with a 60 s timeout and reported, never failing the gate. Their
@@ -159,7 +162,7 @@ and apply or the preview lies.
 |---|---|
 | C1 | Claim the admin account over a port-forward ([06](06-secrets-keys-rbac-crds.md)) **before** publishing DNS |
 | C2 | Smoke test through port-forwards: `kubectl --context "$CONTEXT" -n control-plane port-forward svc/control-ui 3000:3000` -> log in at `http://localhost:3000`; `svc/external-rest-api 8091:8091` -> `curl -s localhost:8091/health`; `svc/rpc-proxy 8094:8094` -> `curl -s localhost:8094/health` |
-| C3 | Check the Host: `kubectl --context "$CONTEXT" -n mcp-host get host,pods` — a Deployment per Host and a `channel-reader-<host>` in `channels` (`0/0` until a `CommunicationChannel` references the Host; that is HCC's doing, not a failure) |
+| C3 | Check the Host: `kubectl --context "$CONTEXT" -n mcp-host get host,deploy,pods` — a Deployment per Host and a `channel-reader-<host>` in `channels` (`0/0` until a `CommunicationChannel` references the Host; that is HCC's doing, not a failure). A Host with `spec.lifecycle.stateless: true` also shows `0/0` and no pod while `status.lifecycle.state` is `suspended` ([01](01-architecture-and-namespaces.md#the-two-controllers)) |
 | C3b | Chat channel, if any: `kubectl --context "$CONTEXT" -n channels get communicationchannel default-channel -o jsonpath='{.spec.credentialsSecretRef.name}'` prints the Secret you created in A5 (or set it now from the Control UI, [06](06-secrets-keys-rbac-crds.md#channel-credentials)); the reader's log shows the Telegram adapter initialising. Without the reference the reader is Ready and silent |
 | C4 | Publish the edge ([03](03-ingress-and-hostnames.md)) and re-test the five hostnames from outside: `curl -sSI https://api.<BASE_DOMAIN>/health` -> 200; `https://app.<BASE_DOMAIN>` -> your SSO or the login page |
 | C5 | Invite a first member from the Control UI (exercises hosted registration) and connect the Desktop App |
@@ -170,7 +173,7 @@ and apply or the preview lies.
 ## Health checks worth scripting
 
 ```bash
-kubectl --context "$CONTEXT" get deploy -A | grep -vE 'kube-system|gke-' | awk '$3!=$4'   # any non-ready
+kubectl --context "$CONTEXT" get deploy -A --no-headers | grep -vE 'kube-system|gke-' | awk '{split($3,r,"/"); if (r[1]!=r[2]) print}'   # any non-ready (0/0 is fine)
 kubectl --context "$CONTEXT" get pods -A | grep -E 'CreateContainerConfigError|CrashLoop|ImagePull'
 kubectl --context "$CONTEXT" -n gfs get globalfilesystem gfs -o jsonpath='{.status.phase}'   # Ready
 kubectl --context "$CONTEXT" -n mcp-host get cm mcp-host-config -o jsonpath='{.metadata.annotations.clerum\.io/auth-key-applied-sha256}'  # non-empty
@@ -191,6 +194,32 @@ bash deploy/scripts/verify-secrets.sh                      # with CONTEXT export
    reports `ExternalEgressReady` not fresh during the window, it is waiting
    for HCC to reconcile existing `McpServer`s — it clears on its own.
 
+### Upgrading from v0.10.0 to v0.11.0
+
+1. **CRDs first (A1), before Phase B.** `mcpservers.clerum.io` gains the
+   extended OAuth schema (`spec.oauth.source`, new transition rules);
+   `workflowrecipes.clerum.io` changes descriptions only. Until the CRD is
+   current the API server prunes the new fields (see [06](06-secrets-keys-rbac-crds.md#crds-first-always)).
+   No RBAC, ServiceAccount or namespace change: A3 is not needed.
+2. Add `RPC_PROXY_ARTIFACT_DOWNLOAD_TIMEOUT_MS: "300000"` to your
+   `configmaps/rpc-proxy-config.yaml` (new in the template). The key is new in
+   v0.11.0; unset, rpc-proxy caps each artifact download body at 60 s.
+3. Phase B in full. B2 applies the new schema migrations and checks the
+   runtime-role privileges they grant; B3 stays where it is. The B6 diff
+   shows, besides tags and the JWT ConfigMap lines: `codex-llm-proxy` /
+   `grok-llm-proxy` memory limit 2048Mi, a new `grok-llm-proxy-config` key,
+   per-route rate limits in `control-api-config`, the approval gateway's
+   larger body size and timeouts, and four stateless-Host env vars on
+   `host-context-controller` (equal to its code defaults; HCC restarts and
+   needs its long first reconcile, as on any image bump). All are base
+   defaults: no overlay change. B11 restarts the consumers of those
+   ConfigMaps (`grok-llm-proxy` rolls anyway: its Deployment changed).
+4. `control-api` must stay `Recreate` (the base default; B4 if your cluster
+   still carries `RollingUpdate`): v0.11.0 password verification must not run
+   alongside an older control-api. Do not roll control-api back to v0.10.0
+   once v0.11.0 has served logins
+   (`docs/how-to/password-work-ownership-recovery.md` in the clone).
+
 ## Rollback
 
 - Fast: `kubectl --context "$CONTEXT" -n <ns> rollout undo deploy/<name>` for
@@ -198,6 +227,8 @@ bash deploy/scripts/verify-secrets.sh                      # with CONTEXT export
   when its rollout gate fails, then still marks the deploy failed). The overlay
   now disagrees with the cluster — fix the overlay next.
 - Correct: revert the overlay to the previous tag and run Phase B again.
+  There are no down-migrations: the older control-api runs against the newer
+  schema, and some releases rule that out (see the upgrade notes above).
   Images for the previous tag must still exist in your registry (they do, on
   the public registry; keep them if you mirror).
 - Postgres schema migrations are forward-only; a rollback to a release whose

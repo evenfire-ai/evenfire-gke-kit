@@ -121,7 +121,7 @@ ships a custom coordinator image (that list is always enforced, digest-pinned).
 
 ## Pull credentials — supported paths
 
-Two pull paths are supported in v0.10.0, and both need **no pull Secret**:
+Two pull paths are supported in v0.11.0, and both need **no pull Secret**:
 
 | Path | Why it works |
 |---|---|

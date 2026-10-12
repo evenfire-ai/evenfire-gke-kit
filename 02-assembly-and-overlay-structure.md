@@ -22,7 +22,7 @@ at `vX.Y.Z` reference the images published as `vX.Y.Z`. Mixing a newer base
 with older images (or vice versa) is unsupported.
 
 ```bash
-export RELEASE_TAG=<RELEASE_TAG>        # e.g. v0.10.0 — agree it with Evenfire
+export RELEASE_TAG=<RELEASE_TAG>        # e.g. v0.11.0 — agree it with Evenfire
 export OVERLAY_NAME=<OVERLAY_NAME>      # e.g. gke-prod
 
 git clone --branch "$RELEASE_TAG" --depth 1 https://github.com/evenfire-ai/evenfire.git evenfire
@@ -41,7 +41,7 @@ edit `deploy/base` in place: your changes belong in the overlay.
 
 Most of what runs on your cluster is defined **upstream**, in the public
 repo, not in this guide. The overlay is a thin layer of environment values on
-top. At `v0.10.0` the base alone renders **250 objects**; your overlay adds
+top. At `v0.11.0` the base alone renders **250 objects**; your overlay adds
 **2** and patches **27** of them (252 total; 261 with the Cloudflare
 ingress slice, which adds 9 more upstream objects, two of which the overlay
 also patches).
@@ -75,7 +75,8 @@ Consequences:
   overlay, then the checks in [Keeping the overlay honest](#keeping-the-overlay-honest-over-time).
 - **Public docs apply too.** The clone ships `docs/` (e.g.
   `docs/deploy/production.md`, `docs/how-to/connect-to-registry.md`,
-  `docs/how-to/connect-telegram.md`, `docs/how-to/member-invitations-self-hosted.md`)
+  `docs/how-to/connect-telegram.md`, `docs/how-to/member-invitations-self-hosted.md`,
+  `docs/how-to/password-work-ownership-recovery.md`)
   for product-level topics. For anything GKE-specific — ordering, secrets,
   NetworkPolicy procedure, registry pull paths — **this guide governs** (for
   example, the generic production notes mention registry pull credentials;

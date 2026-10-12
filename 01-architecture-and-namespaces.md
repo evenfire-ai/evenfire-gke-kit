@@ -55,6 +55,22 @@ from HCC alone. It runs
 `replicas: 1` with `strategy: Recreate` because it must be the single
 NetworkPolicy writer.
 
+**Stateless Hosts scale to zero.** A Host with `spec.lifecycle.stateless: true`
+(default `false`; the template's Host does not set it) keeps its session state
+in SQLite on the workspace PVC, and HCC drives `status.lifecycle.state`
+`active -> draining -> suspended` from the agent's heartbeats: no active work
+and no activity for `max(CONTEXT_MAPPER_STATELESS_IDLE_MINUTES,
+CONTEXT_MAPPER_STATELESS_IDLE_FLOOR_MINUTES)` (base: 30 / 15 min), or the pod
+older than 72 h (code default), starts a drain; once drained (or the 60 s drain
+grace expires after the agent acknowledged it or stopped heartbeating) HCC sets
+the agent Deployment to
+`replicas: 0`. The Deployment, PVC and NetworkPolicies stay; the next request
+for the Host wakes it (rpc-proxy holds the request, up to 48 s by default,
+while HCC scales the Deployment back to 1). HCC rejects the flag
+(`StatelessEnableRejected` condition, Host kept `active`) on a Host with a
+`CommunicationChannel`, a desktop, or an unsatisfiable SharedFileSystem
+co-location.
+
 **workflow-recipes (WRC)** reconciles `WorkflowRecipe` / `WorkflowRecipePolicy`:
 per-recipe coordinator, workflow mcp-host, snippet runner, webhook gateway and
 the per-recipe NetworkPolicies in `sandbox-recipes`. It depends on HCC

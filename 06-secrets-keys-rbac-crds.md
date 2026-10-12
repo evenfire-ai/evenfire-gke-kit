@@ -142,10 +142,10 @@ baseline schema migration that seeds the admin row.
 run regenerates *everything* it owns: the four RSA pairs, the desktop/cookie
 secrets, the `control-postgres` password (back to `postgres/postgres`) — and
 the two **data-encryption keys** in `control-api-secrets`. Those encrypt
-records in Postgres (OAuth grants, the Marketplace/registry connection
-keypair, the hosted-registration credential, LLM subscription connections,
-approval prompt history); with a new key that ciphertext is unreadable, and
-v0.10.0 ships no re-encryption. **Never re-run it on a cluster that has
+records in Postgres (OAuth grants, dynamically registered OAuth clients,
+the Marketplace/registry connection keypair, the hosted-registration
+credential, LLM subscription connections, approval prompt history); with a new key that ciphertext is unreadable, and
+v0.11.0 ships no re-encryption. **Never re-run it on a cluster that has
 data.** Rotate individual keys with the per-key procedures under
 [Key rotation](#key-rotation-key-by-key). If `mcp-host-config` does not exist
 yet (first install, before the overlay apply) it prints a warning; the sync
@@ -361,7 +361,7 @@ defaulting to `ReadWriteOnce`: its `workspace-files-controller` is single-replic
 and the consuming agent pods co-locate with it, so the same `<STORAGE_CLASS_RWO>`
 class as everything else works. ReadWriteMany classes and bucket-backed
 mounts (GKE's Cloud Storage FUSE CSI driver needs a static PV and a pod
-annotation HCC does not set) are **not supported in v0.10.0**. Nothing in
+annotation HCC does not set) are **not supported in v0.11.0**. Nothing in
 the platform needs Workload Identity.
 
 ## Backup
@@ -477,11 +477,11 @@ GFS_REMOTE_RECONCILE_AUTHORIZED=true ALLOWED_CONTEXTS="$CONTEXT" bash scripts/mi
 For a ConfigMap half use `{"data": {...}}` instead of `stringData`.
 
 **Data-encryption keys — do not rotate.** Both live in `control-api-secrets`
-and v0.10.0 ships no re-encryption or dual-key read:
+and v0.11.0 ships no re-encryption or dual-key read:
 
 | Key | Encrypts | Rotating it means |
 |---|---|---|
-| `CONTROL_API_OAUTH_ENCRYPTION_KEY` (AES-256-GCM) | recipe OAuth grants, the Marketplace/registry connection keypair and client secret, the hosted-registration credential, LLM subscription connections and their OAuth state | every one of those records fails to decrypt (control-api logs `registry_connection_state_unreadable` at boot); users re-consent, the registry Connect flow must be redone. Unsupported |
+| `CONTROL_API_OAUTH_ENCRYPTION_KEY` (AES-256-GCM) | recipe and MCP server OAuth grants, dynamically registered MCP OAuth client credentials, the Marketplace/registry connection keypair and client secret, the hosted-registration credential, LLM subscription connections and their OAuth state | every one of those records fails to decrypt (control-api logs `registry_connection_state_unreadable` at boot); users re-consent, the registry Connect flow must be redone. Unsupported |
 | `TRACING_APPROVAL_PROMPT_HISTORY_ENCRYPTION_KEY` + `TRACING_APPROVAL_PROMPT_HISTORY_KEY_VERSION` (`v1`, ConfigMap `control-api-config`) | captured approval prompts (governed history) | the only knob is bumping the version together with a new key: history captured under the old version reads as `unavailable` — loss by design, not migration |
 
 If a compromise forces a rotation anyway: keep the previous key in your
