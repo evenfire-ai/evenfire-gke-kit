@@ -1,8 +1,7 @@
 # Overlay template (GKE)
 
-A sanitized copy of the Kustomize overlay Evenfire runs in production, with
-every environment-specific value replaced by a `<PLACEHOLDER>` and marked
-`# CHANGE ME`. Copy it into an assembled public tree as
+The Kustomize overlay for your GKE environment. Every environment-specific
+value is a `<PLACEHOLDER>` marked `# CHANGE ME`. Copy it into an assembled public tree as
 `deploy/overlays/<OVERLAY_NAME>/` (see [../02-assembly-and-overlay-structure.md](../02-assembly-and-overlay-structure.md)).
 
 ```
