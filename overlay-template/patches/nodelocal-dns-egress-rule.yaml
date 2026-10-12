@@ -1,0 +1,17 @@
+# JSON6902 patch appended to every per-namespace DNS egress NetworkPolicy
+# (targets are listed in kustomization.yaml). The base DNS rules select
+# kube-system pods; with GKE NodeLocal DNSCache the resolver pods answer on the
+# kube-dns Service ClusterIP from the node, so an explicit ipBlock allow is
+# required under enforcement. Rewritten by scripts/detect-k8s-api-ip.sh from:
+#   kubectl --context "$CONTEXT" -n kube-system get svc kube-dns -o jsonpath='{.spec.clusterIP}'
+- op: add
+  path: /spec/egress/-
+  value:
+    ports:
+      - port: 53
+        protocol: UDP
+      - port: 53
+        protocol: TCP
+    to:
+      - ipBlock:
+          cidr: <KUBE_DNS_CLUSTER_IP>/32   # CHANGE ME (script)

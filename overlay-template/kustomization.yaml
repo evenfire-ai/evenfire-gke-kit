@@ -1,0 +1,211 @@
+# Evenfire GKE overlay template (customer copy).
+#
+# This overlay does NOT render on its own: `../../base` and `../../base/ingress`
+# come from the public evenfire-ai/evenfire repository at the release tag whose
+# images you deploy. See ../02-assembly-and-overlay-structure.md for the assembly
+# recipe and ../09-values-checklist.md for every placeholder.
+#
+# Placeholders are UPPER_CASE names in angle brackets. Every line marked "CHANGE ME" must be edited
+# before `kubectl kustomize` output is applied. Gate before apply:
+#   grep -rn '<[A-Z_]*>' deploy/overlays/OVERLAY_NAME --include='*.yaml'   # must print nothing
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  # Cloudflare Tunnel ingress (cloudflared Deployment + its NetworkPolicies).
+  # Opt-in: uncomment ONLY if you expose the platform through a Cloudflare
+  # Tunnel. Otherwise keep it commented and add your own ingress resources +
+  # NetworkPolicies (see ../03-ingress-and-hostnames.md).
+  # - ../../base/ingress
+  # - configmaps/cloudflared-config.yaml
+  # rpc-proxy-config is not in base (deployment references it via configMapRef)
+  - configmaps/rpc-proxy-config.yaml
+  # mcp-host-config is not in base (deployment references it via configMapRef)
+  - configmaps/mcp-host-config.yaml
+  # Optional: binds a base Role to your deploy service account so CI can read
+  # NetworkPolicies. Only enable it if you apply RBAC out-of-band with an
+  # admin identity (a non-admin deploy SA gets 403 on RBAC kinds).
+  # - rbac-e2e-compat.yaml
+
+# Container images. `name` is the logical name used in deploy/base; `newName`
+# is where your cluster pulls from; `newTag` is the release tag (or sha-* tag
+# if you mirror per-commit builds). Keep every entry on the SAME tag unless you
+# know why not. Images embedded in env-var values are listed in
+# patches/dynamic-images.yaml and must be bumped together with these.
+images:
+  - name: clerum/channel-reader
+    newName: <REGISTRY_PATH>/channel-reader        # CHANGE ME
+    newTag: "<IMAGE_TAG>"                           # CHANGE ME
+  - name: clerum/workflow-approval-request-reader
+    newName: <REGISTRY_PATH>/workflow-approval-request-reader
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/control-api
+    newName: <REGISTRY_PATH>/control-api
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/control-ui
+    newName: <REGISTRY_PATH>/control-ui
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/external-rest-api
+    newName: <REGISTRY_PATH>/external-rest-api
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/host-context-controller
+    newName: <REGISTRY_PATH>/host-context-controller
+    newTag: "<IMAGE_TAG>"
+  # The base references clerum/mcp-host; GKE deployments run the slim variant.
+  - name: clerum/mcp-host
+    newName: <REGISTRY_PATH>/mcp-host-slim
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/mcp-proxy
+    newName: <REGISTRY_PATH>/mcp-proxy
+    newTag: "<IMAGE_TAG>"
+  # No static reference in base (env-only, see patches/dynamic-images.yaml);
+  # this entry matches nothing today and is kept for forward compatibility.
+  - name: clerum/nginx-egress-proxy
+    newName: <REGISTRY_PATH>/nginx-egress-proxy
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/profile-ui
+    newName: <REGISTRY_PATH>/profile-ui
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/rpc-proxy
+    newName: <REGISTRY_PATH>/rpc-proxy
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/workflow-recipes
+    newName: <REGISTRY_PATH>/workflow-recipes
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/workflow-snippet-runner
+    newName: <REGISTRY_PATH>/workflow-snippet-runner
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/workspace-files-controller
+    newName: <REGISTRY_PATH>/workspace-files-controller
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/webhook-proxy
+    newName: <REGISTRY_PATH>/webhook-proxy
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/codex-llm-proxy
+    newName: <REGISTRY_PATH>/codex-llm-proxy
+    newTag: "<IMAGE_TAG>"
+  - name: clerum/grok-llm-proxy
+    newName: <REGISTRY_PATH>/grok-llm-proxy
+    newTag: "<IMAGE_TAG>"
+  # webhook-gateway, workflow-coordinator, stdio-bridge, gfs-controller and
+  # mcp-host-desktop have no static manifest: controllers spawn them at runtime
+  # from env vars, so they live ONLY in patches/dynamic-images.yaml.
+
+# Multi-document YAML must use patchesStrategicMerge. Listing those files under
+# `patches:` makes kubectl fail with "unable to parse SM or JSON patch".
+patchesStrategicMerge:
+  - configmaps/control-api-config.yaml
+  - configmaps/codex-llm-proxy-config.yaml
+  - configmaps/channel-reader-config.yaml
+  - patches/resource-limits.yaml
+  - patches/gfs-upload-storage-floor.yaml
+  - patches/external-rest-api-cors.yaml
+  - patches/dynamic-images.yaml
+  - patches/nginx-workflow-approval-gateway.yaml
+
+# Single-document patches. The K8s API IP patches and the NodeLocal DNS rule
+# are rewritten by scripts/detect-k8s-api-ip.sh — run it against YOUR cluster.
+patches:
+  - path: patches/storage-class.yaml
+  - path: patches/k8s-api-ip.yaml
+  - path: patches/k8s-api-ip-mcp-host.yaml
+  - path: patches/k8s-api-ip-channels.yaml
+  - path: patches/hcc-k8s-api-cidrs.yaml
+  - path: patches/hcc-pull-ref-overrides.yaml
+  - path: patches/hcc-allowed-image-prefixes.yaml
+  - path: patches/workflow-output-storageclass.yaml
+  # NodeLocal DNSCache: on GKE, DNS egress must also allow the kube-dns Service
+  # ClusterIP as an ipBlock (namespace/pod selectors alone are not enough).
+  # One JSON6902 patch, applied to every per-namespace DNS policy.
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: allow-dns-egress-channels
+      namespace: channels
+    path: patches/nodelocal-dns-egress-rule.yaml
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: allow-dns-egress-control-plane
+      namespace: control-plane
+    path: patches/nodelocal-dns-egress-rule.yaml
+  # Uncomment together with ../../base/ingress above. A target that matches
+  # nothing is silently skipped, so forgetting this renders fine but leaves
+  # cloudflared without DNS under enforcement (render check in ../02).
+  # - target:
+  #     group: networking.k8s.io
+  #     version: v1
+  #     kind: NetworkPolicy
+  #     name: allow-dns-egress-ingress
+  #     namespace: ingress
+  #   path: patches/nodelocal-dns-egress-rule.yaml
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: allow-dns-egress-mcp-host
+      namespace: mcp-host
+    path: patches/nodelocal-dns-egress-rule.yaml
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: allow-dns-egress-mcp-server
+      namespace: mcp-server
+    path: patches/nodelocal-dns-egress-rule.yaml
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: allow-dns-egress-profiles
+      namespace: profiles
+    path: patches/nodelocal-dns-egress-rule.yaml
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: allow-dns-egress-rpc-proxy
+      namespace: rpc-proxy
+    path: patches/nodelocal-dns-egress-rule.yaml
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: allow-dns-egress-sandbox-recipes
+      namespace: sandbox-recipes
+    path: patches/nodelocal-dns-egress-rule.yaml
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: sandbox-ui-static-dns-egress
+      namespace: sandbox-ui
+    path: patches/nodelocal-dns-egress-rule.yaml
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: allow-dns-egress-webhook-ingress
+      namespace: webhook-ingress
+    path: patches/nodelocal-dns-egress-rule.yaml
+
+# Projects the canonical private/reserved CIDR exclusion list into the
+# cloudflared public-egress rule. Harmless when the ingress base is disabled
+# (a replacement with no matching target is a no-op), required when enabled.
+replacements:
+  - source:
+      group: clerum.io
+      version: v1alpha1
+      kind: PublicEgressExceptionSet
+      name: public-egress-exceptions
+      fieldPath: spec.ranges
+    targets:
+      - select:
+          group: networking.k8s.io
+          version: v1
+          kind: NetworkPolicy
+          name: allow-cloudflared-egress
+        fieldPaths:
+          - spec.egress.*.to.*.ipBlock.except

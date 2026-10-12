@@ -1,0 +1,24 @@
+# OPTIONAL — a chat channel bound to the Host. Bot tokens are NOT in this
+# file: the channel-reader reads them from the Secret named in
+# spec.credentialsSecretRef (namespace channels; keys telegram-bot-token,
+# slack-bot-token, slack-signing-secret, teams-app-password, email-username,
+# email-password). Without that reference the reader is Ready but starts no
+# adapter. Either create the Secret first and uncomment credentialsSecretRef
+# (see ../../06-secrets-keys-rbac-crds.md, "Channel credentials"), or leave it
+# unset and let the Control UI ("Channel credentials" on the channel's edit
+# page) create cc-<channel>-credentials and set the reference for you.
+# Replace the user id allowlist with the Telegram user ids allowed to talk to
+# the agent.
+apiVersion: clerum.io/v1alpha1
+kind: CommunicationChannel
+metadata:
+  name: default-channel
+  namespace: channels
+spec:
+  hostRef: chatllm
+  # credentialsSecretRef: { name: cc-default-channel-credentials }   # Secret you created (06)
+  telegram:
+    - channelId: "default-channel"
+      chatType: private
+      userIds:
+        - "<TELEGRAM_USER_ID>"   # CHANGE ME

@@ -1,0 +1,11 @@
+# Default Context: defines which MCP servers the Host may reach. Start empty;
+# add McpServer references from the Control UI or by editing this list.
+apiVersion: clerum.io/v1alpha1
+kind: Context
+metadata:
+  name: context1
+  namespace: mcp-server
+spec:
+  contextId: context1
+  description: Default context — defines which MCP servers the host can access.
+  mcpServers: []

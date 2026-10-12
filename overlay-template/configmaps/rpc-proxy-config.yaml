@@ -1,0 +1,42 @@
+# rpc-proxy is the Desktop App / Control UI streaming edge (SSE + long-lived
+# HTTP). This ConfigMap is not in base; the Deployment references it via
+# configMapRef, so the overlay must ship it in full.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rpc-proxy-config
+  namespace: rpc-proxy
+  labels:
+    app: rpc-proxy
+data:
+  RPC_PROXY_PORT: "8094"
+  # Browser origins allowed to call the rpc hostname: the Control UI and the
+  # public API origin (which serves OAuth callbacks).
+  RPC_PROXY_CORS_ORIGIN: "https://app.<BASE_DOMAIN>,https://api.<BASE_DOMAIN>"   # CHANGE ME
+  RPC_PROXY_JWT_ISSUER: "control-api"
+  RPC_PROXY_JWT_AUDIENCE: "rpc-proxy"
+  RPC_PROXY_CONTROL_API_BASE_URL: "http://control-api-rpc-gateway.control-plane.svc.cluster.local:8090/api/v1"
+  RPC_PROXY_CONTROL_API_CACHE_TTL_MS: "30000"
+  RPC_PROXY_UPSTREAM_TIMEOUT_MS: "60000"
+  RPC_PROXY_MAX_TOKEN_LENGTH: "4096"
+  RPC_PROXY_ARTIFACT_DOWNLOAD_MAX_MB: "250"
+  RPC_PROXY_ALLOWED_METHOD_PATTERN: "^[a-zA-Z0-9_./:-]{1,120}$"
+  # Stream budgets. Your ingress must allow idle connections at least this long
+  # (RPC_PROXY_STREAM_MAX_LIFETIME_MS = 10 min) and must not buffer responses.
+  RPC_PROXY_STREAM_MAX_LIFETIME_MS: "600000"
+  RPC_PROXY_STREAM_INTERVAL_MS: "3000"
+  RPC_PROXY_STREAM_KEEPALIVE_MS: "15000"
+  RPC_PROXY_STREAM_MAX_CONCURRENT: "1000"
+  RPC_PROXY_STREAM_MAX_PER_USER: "3"
+  RPC_PROXY_STREAM_MAX_PER_USER_HOST: "1"
+  RPC_PROXY_STREAM_IDLE_TIMEOUT_MS: "60000"
+  RPC_PROXY_ACTIVITY_STREAM_MAX_LIFETIME_MS: "600000"
+  RPC_PROXY_ACTIVITY_STREAM_KEEPALIVE_MS: "15000"
+  RPC_PROXY_ACTIVITY_STREAM_IDLE_TIMEOUT_MS: "60000"
+  RPC_PROXY_ACTIVITY_STREAM_MAX_CONCURRENT: "1000"
+  RPC_PROXY_ACTIVITY_STREAM_MAX_PER_USER: "3"
+  RPC_PROXY_ACTIVITY_STREAM_MAX_PER_USER_HOST: "3"
+  RPC_PROXY_HCC_BASE_URL: "http://host-context-controller-api-gateway.control-plane.svc.cluster.local:8081"
+  RPC_PROXY_HOST_NAMESPACE: "mcp-host"
+  # MUST equal control-api-config CONTROL_API_OAUTH_CALLBACK_BASE_URL.
+  RPC_PROXY_OAUTH_CALLBACK_BASE_URL: "https://api.<BASE_DOMAIN>"   # CHANGE ME

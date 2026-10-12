@@ -1,0 +1,10 @@
+# StorageClass for the control-plane Postgres PVC (ReadWriteOnce). On GKE the
+# built-in `standard-rwo` (pd-balanced) or `premium-rwo` (pd-ssd) classes work.
+# Must support allowVolumeExpansion if you ever grow the 5Gi base size.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: control-postgres-data
+  namespace: control-plane
+spec:
+  storageClassName: <STORAGE_CLASS_RWO>   # CHANGE ME  e.g. standard-rwo

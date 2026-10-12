@@ -1,0 +1,29 @@
+# Cluster-specific CIDRs HCC uses when it reconciles NetworkPolicies in its
+# runtime namespaces (mcp-server, rpc-proxy, sandbox-recipes, sandbox-ui).
+#
+# CONTEXT_MAPPER_K8S_API_CIDRS: without it HCC falls back to a single ipBlock
+# built from KUBERNETES_SERVICE_HOST (the `kubernetes` Service ClusterIP). On
+# GKE the kube-proxy/dataplane DNATs that ClusterIP to the API-server endpoint
+# and policy is evaluated against the POST-DNAT address, so the rule must carry
+# BOTH. HCC validates the value at startup and crashes on a malformed or
+# over-broad entry (a leftover placeholder fails loudly — good).
+#
+# CONTEXT_MAPPER_NODELOCAL_DNS_CIDR: the kube-dns Service ClusterIP, allowed as
+# an ipBlock so DNS keeps working with NodeLocal DNSCache under enforcement.
+#
+# scripts/detect-k8s-api-ip.sh rewrites both values from the live cluster.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: host-context-controller
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: host-context-controller
+          env:
+            - name: CONTEXT_MAPPER_K8S_API_CIDRS
+              value: "<K8S_API_CLUSTER_IP>/32,<K8S_API_ENDPOINT_IP>/32"   # CHANGE ME (script)
+            - name: CONTEXT_MAPPER_NODELOCAL_DNS_CIDR
+              value: "<KUBE_DNS_CLUSTER_IP>/32"                           # CHANGE ME (script)

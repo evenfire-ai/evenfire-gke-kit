@@ -1,0 +1,21 @@
+# Kubernetes API egress for HCC-managed mcp-host pods. mcp-host is NOT one of
+# HCC's runtime namespaces, so this static policy must carry the real
+# apiserver CIDRs. Same two-ipBlock rationale as patches/k8s-api-ip.yaml.
+# Rewritten by scripts/detect-k8s-api-ip.sh.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-k8s-api-egress-mcp-host
+  namespace: mcp-host
+spec:
+  egress:
+    - to:
+        - ipBlock:
+            cidr: <K8S_API_CLUSTER_IP>/32    # CHANGE ME (script)
+        - ipBlock:
+            cidr: <K8S_API_ENDPOINT_IP>/32   # CHANGE ME (script)
+      ports:
+        - port: 443
+          protocol: TCP
+        - port: 8443
+          protocol: TCP

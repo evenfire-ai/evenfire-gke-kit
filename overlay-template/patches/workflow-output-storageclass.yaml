@@ -1,0 +1,19 @@
+# Legacy shared workflow-output PVC. The base declares it ReadWriteMany with
+# no StorageClass. On a single-node GKE pool ReadWriteOnce works because every
+# pod lands on the same node; on a multi-node pool either keep RWO and accept
+# that only one node can mount it, or switch to a ReadWriteMany class (GKE
+# Filestore CSI: `gcloud container clusters update CLUSTER_NAME
+# --update-addons=GcpFilestoreCsiDriver=ENABLED`, then a Filestore-backed
+# StorageClass and accessModes: [ReadWriteMany]).
+#
+# New WorkflowRecipes get their own per-recipe output PVC from WRC; this claim
+# only matters for recipes explicitly pinned to it.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: clerum-workflow-output
+  namespace: sandbox-recipes
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: <STORAGE_CLASS_RWO>   # CHANGE ME  (or an RWX class + ReadWriteMany)

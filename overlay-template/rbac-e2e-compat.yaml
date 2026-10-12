@@ -1,0 +1,17 @@
+# OPTIONAL — binds the base `e2e-compat-networkpolicy-reader` Role to the
+# identity your CI deploys with, so post-deploy verification scripts can read
+# NetworkPolicies. Commented out of kustomization.yaml by default because RBAC
+# objects must be applied with an ADMIN identity (see ../06-secrets-keys-rbac-crds.md).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: e2e-compat-networkpolicy-reader
+  namespace: control-plane
+subjects:
+- kind: User
+  name: <DEPLOY_SA_EMAIL>   # CHANGE ME  e.g. deployer@PROJECT_ID.iam.gserviceaccount.com
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: e2e-compat-networkpolicy-reader

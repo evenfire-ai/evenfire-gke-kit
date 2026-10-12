@@ -1,0 +1,21 @@
+# Plugin image-host allowlist for HCC-spawned workloads. Base ships a
+# vendor-neutral default; put YOUR registry first. Keep in sync with
+# CONTROL_API_ALLOWED_IMAGE_PREFIXES in configmaps/control-api-config.yaml.
+# `registry.evenfire.ai/` admits plugin images installed from the Evenfire
+# registry (Marketplace); drop it if you do not use the registry.
+#
+# Strategic-merge patch keyed by env-var NAME (containers[].env merges by
+# name), so it is immune to env reordering in the base.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: host-context-controller
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: host-context-controller
+          env:
+            - name: CONTEXT_MAPPER_ALLOWED_IMAGE_PREFIXES
+              value: <REGISTRY_PATH>/,registry.evenfire.ai/,mongodb/,mcr.microsoft.com/,clerum/   # CHANGE ME

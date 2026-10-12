@@ -1,0 +1,73 @@
+# Overrides for the base `control-api-config` ConfigMap (strategic merge:
+# keys here are added to / replace keys in deploy/base/control-plane/configmaps.yaml).
+#
+# Every https:// value embeds one of your public hostnames. The subdomain roles
+# (app., profile., api., rpc., webhook.) are a convention, not a requirement —
+# keep them consistent across this file, rpc-proxy-config.yaml,
+# channel-reader-config.yaml, patches/external-rest-api-cors.yaml and
+# patches/dynamic-images.yaml (WEBHOOK_PUBLIC_BASE_URL).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: control-api-config
+  namespace: control-plane
+  labels:
+    app: control-api
+data:
+  # Explicit initial-setup Control Admin <-> Desktop GFS operator link. The
+  # DB migration gate runs before the overlay is applied and control-api is
+  # restarted afterwards so new pods load the flag.
+  CONTROL_API_DESKTOP_GFS_OPERATOR_LINKING_ENABLED: "true"
+  # Labels attached to governed traces. Free-form, informational.
+  TRACING_ENVIRONMENT: "<ENV_NAME>"            # CHANGE ME  e.g. prod
+  TRACING_CLUSTER_NAME: "<CLUSTER_NAME>"       # CHANGE ME
+  TRACING_CLUSTER_LOCATION: "<ZONE>"           # CHANGE ME  e.g. europe-west1-b
+  # Public origins the platform hands out in links and OAuth flows.
+  CONTROL_API_DESKTOP_PROFILE_UI_BASE_URL: "https://profile.<BASE_DOMAIN>"   # CHANGE ME
+  CONTROL_API_CONTROL_UI_BASE_URL: "https://app.<BASE_DOMAIN>"               # CHANGE ME
+  CONTROL_API_CONTROL_UI_APP_NAME: "<APP_NAME>"                              # CHANGE ME  e.g. Evenfire
+  # Origins the Desktop App is told to use (sent in invitation flows). The base
+  # defaults are 127.0.0.1 port-forward values; set them to the public API and
+  # RPC origins. Verify with Evenfire if your deployment does not use the
+  # Desktop App.
+  CONTROL_API_DESKTOP_EXTERNAL_REST_API_BASE_URL: "https://api.<BASE_DOMAIN>"  # CHANGE ME
+  CONTROL_API_DESKTOP_RPC_PROXY_BASE_URL: "https://rpc.<BASE_DOMAIN>"         # CHANGE ME
+  # Public origin of the OAuth callback (the redirect_uri sent in the token
+  # exchange). MUST equal rpc-proxy's RPC_PROXY_OAUTH_CALLBACK_BASE_URL so the
+  # authorize and token redirect_uris match. Behind any reverse proxy the
+  # request Host seen by control-api is internal, so this is set explicitly.
+  CONTROL_API_OAUTH_CALLBACK_BASE_URL: "https://api.<BASE_DOMAIN>"            # CHANGE ME
+  # Per-user OAuth broker for OAuth-protected MCP servers. Fail-closed OFF by
+  # default in base; without it an OAuth McpServer suspends for consent forever.
+  MCP_OAUTH_BROKER_ENABLED: "true"
+  # Member-invitation email. `hosted` enrolls this deployment with the
+  # Evenfire-operated registration hub (outbound HTTPS required; your UI
+  # hostnames must be real public DNS names). Do NOT also set
+  # CONTROL_API_MEMBER_REGISTRATION_HMAC_KID / _TENANT_ID — control-api refuses
+  # to start hosted mode while those are present. To run your own
+  # member-registration-service instead, leave the mode `remote` and set the
+  # service base URL + HMAC identity (ask Evenfire for the contract).
+  CONTROL_API_MEMBER_REGISTRATION_MODE: "hosted"
+  # Plugin registry. control-api defaults to `managed` (deployments Evenfire
+  # provisions and connects); a deployment you run yourself must be `self-hosted`,
+  # the only mode in which the Control UI -> Marketplace -> Connect flow runs.
+  # No credentials are issued or configured here: Connect generates this
+  # deployment's own keypair and registers it; registry auth turns on by itself
+  # once that completes. Needs outbound HTTPS from control-api (the base
+  # control-api-external-egress policy already allows public 443).
+  # This key is also read by workflow-recipes (base configMapKeyRef), so set it
+  # only here. control-api refuses to start if the URL is not allowlisted; the
+  # public registry is allowlisted by default.
+  CLERUM_REGISTRY_URL: "https://registry.evenfire.ai"
+  REGISTRY_CONNECTION_MODE: "self-hosted"
+  # Image-host allowlist for plugin/recipe workloads (audit mode unless
+  # CONTROL_API_ENFORCE_IMAGE_ALLOWLIST=true). Base ships a vendor-neutral
+  # default; put YOUR registry first. Keep in sync with
+  # patches/hcc-allowed-image-prefixes.yaml. `registry.evenfire.ai/` admits
+  # plugin images installed from the registry; drop it if you do not use it.
+  CONTROL_API_ALLOWED_IMAGE_PREFIXES: "<REGISTRY_PATH>/,registry.evenfire.ai/,mongodb/,mcr.microsoft.com/,clerum/"   # CHANGE ME
+  # The public base injects an OSS default Postgres DSN (postgres:postgres).
+  # control-api reads its real connection from the control-api-postgres-runtime
+  # Secret via an explicit secretKeyRef env (which shadows envFrom). Delete the
+  # misleading default via strategic-merge null so the render matches reality.
+  CONTROL_API_PG_CONNECTION_STRING: null

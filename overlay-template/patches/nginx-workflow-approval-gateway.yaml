@@ -1,0 +1,20 @@
+# Resources for the nginx gateway mcp-host pods use to reach control-api's
+# approval/auth/usage endpoints. Tiny; indicative values, tune
+# from observed usage.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-workflow-approval-gateway
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: nginx
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 16Mi

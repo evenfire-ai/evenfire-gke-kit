@@ -1,0 +1,29 @@
+# Kubernetes API egress for the control-plane namespace (HCC, WRC,
+# control-api, trace-maintenance-worker). The base ships a placeholder CIDR;
+# this overlay MUST replace it with this cluster's values.
+#
+# Two ipBlocks on purpose: the `kubernetes` Service ClusterIP AND the real
+# API-server endpoint IP. The dataplane DNATs ClusterIP -> endpoint; GKE's
+# Calico add-on enforces egress against the post-DNAT address (verified), so a
+# ClusterIP-only rule drops apiserver traffic once enforcement is on. Both are
+# kept so the rule is intended to hold whichever side your CNI evaluates on;
+# on Dataplane V2 verify it (../04-network-policies-and-cni.md probes).
+#
+# Rewritten by scripts/detect-k8s-api-ip.sh:
+#   kubectl --context "$CONTEXT" get svc kubernetes -n default -o jsonpath='{.spec.clusterIP}'
+#   kubectl --context "$CONTEXT" get endpoints kubernetes -n default -o jsonpath='{.subsets[*].addresses[*].ip}'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-k8s-api-egress-control-plane
+  namespace: control-plane
+spec:
+  egress:
+    - to:
+        - ipBlock:
+            cidr: <K8S_API_CLUSTER_IP>/32    # CHANGE ME (script)
+        - ipBlock:
+            cidr: <K8S_API_ENDPOINT_IP>/32   # CHANGE ME (script)
+      ports:
+        - port: 443
+          protocol: TCP

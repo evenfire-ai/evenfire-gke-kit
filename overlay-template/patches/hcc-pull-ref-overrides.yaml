@@ -1,0 +1,26 @@
+# Image pull Secret references HCC injects into the Host and SharedFileSystem
+# pods it spawns. HCC's built-in defaults name a Secret that does not exist on
+# your cluster, so this patch clears them.
+#
+# Supported pull paths need no pull Secret: anonymous pulls from the public
+# registry, or Artifact Registry in your project pulled through the NODE
+# identity (roles/artifactregistry.reader on the node service account), which
+# covers every pod on the node. A registry that needs credentials is NOT
+# supported for the platform images: the per-Host channel-reader and the
+# WRC-spawned recipe pods carry no pull-Secret wiring, so a name set here
+# would only cover part of the fleet (see ../../05-images-registry-and-pinning.md).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: host-context-controller
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: host-context-controller
+          env:
+            - name: CONTEXT_MAPPER_HOST_IMAGE_PULL_SECRET
+              value: ""
+            - name: CONTEXT_MAPPER_WFC_IMAGE_PULL_SECRET
+              value: ""

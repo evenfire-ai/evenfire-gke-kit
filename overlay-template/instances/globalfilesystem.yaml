@@ -1,0 +1,24 @@
+# Global File System instance. HCC's gfsReconciler creates the gfsc writer and
+# reader Deployments, Service, PVC and NetworkPolicies from this object. The
+# volume is one ReadWriteOnce controller-mounted disk; readers use the gfsc
+# HTTP API, so RWO is sufficient on any node pool.
+apiVersion: clerum.io/v1alpha1
+kind: GlobalFileSystem
+metadata:
+  name: gfs
+  namespace: gfs
+spec:
+  storage:
+    size: <GFS_SIZE>                        # CHANGE ME  indicative 100–500Gi; size for your data
+    storageClassName: <STORAGE_CLASS_RWO>   # CHANGE ME  e.g. standard-rwo
+    accessModes:
+      - ReadWriteOnce
+  layout:
+    rootDirectories:
+      - /org
+      - /system/published-workflow-artifacts
+  security:
+    runAsUser: 1000
+    fsGroup: 1000
+  readerReplicas: 2
+  retainOnDelete: true

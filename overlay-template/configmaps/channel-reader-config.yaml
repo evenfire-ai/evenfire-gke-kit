@@ -1,0 +1,14 @@
+# Base ships CLERUM_PROFILE_UI_URL commented out on purpose: the value is
+# per-deployment. HCC's per-Host channel-reader Deployment consumes this whole
+# ConfigMap via envFrom, so the key reaches the pod with no controller change.
+#
+# Must match CONTROL_API_DESKTOP_PROFILE_UI_BASE_URL (control-api-config.yaml)
+# and whatever hostname your ingress routes to profile-ui: an unverified chat
+# sender is sent to this URL to link their account.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clerum-channel-reader-config
+  namespace: channels
+data:
+  CLERUM_PROFILE_UI_URL: "https://profile.<BASE_DOMAIN>"   # CHANGE ME

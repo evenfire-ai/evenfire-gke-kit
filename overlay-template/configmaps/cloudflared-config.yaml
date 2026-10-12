@@ -1,0 +1,42 @@
+# ONLY used when `../../base/ingress` is enabled in kustomization.yaml.
+#
+# Locally-managed Cloudflare Tunnel: the hostname -> Service routing table
+# lives HERE, not in the Cloudflare dashboard. cloudflared resolves the tunnel
+# by UUID using the credentials file alone (the tunnel NAME would need the
+# cert.pem artifact from `cloudflared tunnel login`, which is never shipped
+# into the pod).
+#
+# Pairing rule: every hostname here needs (a) a DNS CNAME to
+# TUNNEL_UUID.cfargotunnel.com and (b) an egress rule in the base
+# `allow-cloudflared-egress` NetworkPolicy for its upstream Service/port.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared-config
+  namespace: ingress
+  labels:
+    app.kubernetes.io/component: ingress
+data:
+  config.yaml: |
+    tunnel: <TUNNEL_UUID>                                  # CHANGE ME
+    # credentials.json is mounted at /etc/cloudflared-creds/ (a dedicated dir,
+    # NOT inside /etc/cloudflared which is the read-only ConfigMap mount).
+    credentials-file: /etc/cloudflared-creds/credentials.json
+    metrics: 0.0.0.0:2000
+    ingress:
+      - hostname: app.<BASE_DOMAIN>                        # CHANGE ME
+        service: http://control-ui.control-plane.svc.cluster.local:3000
+      - hostname: profile.<BASE_DOMAIN>                    # CHANGE ME
+        service: http://profile-ui.profiles.svc.cluster.local:3001
+      - hostname: api.<BASE_DOMAIN>                        # CHANGE ME
+        service: http://external-rest-api.profiles.svc.cluster.local:8091
+      - hostname: rpc.<BASE_DOMAIN>                        # CHANGE ME
+        service: http://rpc-proxy.rpc-proxy.svc.cluster.local:8094
+        originRequest:
+          # SSE streams: keep chunked encoding (false is the default; pinned so
+          # a config sweep does not flip it).
+          disableChunkedEncoding: false
+          connectTimeout: 30s
+      - hostname: webhook.<BASE_DOMAIN>                    # CHANGE ME
+        service: http://webhook-proxy.webhook-ingress.svc.cluster.local:8095
+      - service: http_status:404

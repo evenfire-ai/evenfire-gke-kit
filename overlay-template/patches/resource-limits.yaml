@@ -1,0 +1,173 @@
+# INDICATIVE resource requests/limits for the static platform Deployments:
+# a starting point that fits one e2-standard-8 node, not a requirement. Tune
+# from observed usage (`kubectl top pods -A`). Sum of requests
+# below is ~1 vCPU / ~1.3 GiB; limits ~4.3 vCPU / ~4 GiB. Runtime pods HCC and
+# WRC spawn (per-Host mcp-host up to 2Gi each, channel-readers, recipe
+# coordinators, MCP servers) come ON TOP of this — size the node pool for
+# the fleet you intend to run (see ../00-prerequisites.md).
+#
+# Per-Host channel-reader pods are sized by HCC in code (requests 50m/128Mi,
+# limits 200m/256Mi), not here.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-api
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: control-api
+          resources:
+            limits:
+              cpu: 500m
+              memory: 768Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-ui
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: control-ui
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+# host-context-controller: K8s operator, needs headroom for reconcile bursts
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: host-context-controller
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: host-context-controller
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+            requests:
+              cpu: 200m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-recipes
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: workflow-recipes
+          resources:
+            limits:
+              cpu: 400m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-postgres
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: postgres
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-proxy
+  namespace: mcp-server
+spec:
+  template:
+    spec:
+      containers:
+        - name: mcp-proxy
+          resources:
+            limits:
+              cpu: 400m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+# rpc-proxy: SSE/long-lived connection gateway (2 replicas in base)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rpc-proxy
+  namespace: rpc-proxy
+spec:
+  template:
+    spec:
+      containers:
+        - name: rpc-proxy
+          resources:
+            limits:
+              cpu: 700m
+              memory: 768Mi
+            requests:
+              cpu: 150m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-rest-api
+  namespace: profiles
+spec:
+  template:
+    spec:
+      containers:
+        - name: external-rest-api
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: profile-ui
+  namespace: profiles
+spec:
+  template:
+    spec:
+      containers:
+        - name: profile-ui
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi

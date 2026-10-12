@@ -1,0 +1,32 @@
+# First agent Host. Applied SEPARATELY from the overlay (kubectl apply -f
+# instances/), after the CRDs and the controllers are up. `secretRef` names the
+# Secret in the mcp-host namespace holding your LLM provider API keys
+# (see ../06-secrets-keys-rbac-crds.md); `model.provider` must be a key of the
+# base `clerum-model-secret-mapping` ConfigMap (openai, claude, zai, bailian,
+# vertex) and `model.name` a model that provider serves.
+apiVersion: clerum.io/v1alpha1
+kind: Host
+metadata:
+  name: chatllm
+  namespace: mcp-host
+spec:
+  host: chatLLM
+  contextRef: context1
+  secretRef: chatllm-api-keys
+  model:
+    provider: <LLM_PROVIDER>   # CHANGE ME  e.g. openai
+    name: <LLM_MODEL>          # CHANGE ME  e.g. gpt-4.1
+  workflowControl:
+    scopes:
+      - workflow:list
+      - workflow:read
+      - workflow:trigger
+      - workflow:approval:resolve
+      - workflow:approval:decide
+  channels:
+    - all-channels
+  approval:
+    defaultPolicy: channel_users
+    channels:
+      telegram:
+        enabled: true

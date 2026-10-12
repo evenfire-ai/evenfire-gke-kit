@@ -1,0 +1,22 @@
+# Override the base's localhost CORS/base-URL values for external-rest-api,
+# the public REST API behind the api hostname. The two UI origins make
+# browser calls to it; the desktop values are handed to the Desktop App.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-rest-api
+  namespace: profiles
+spec:
+  template:
+    spec:
+      containers:
+        - name: external-rest-api
+          env:
+            - name: EXTERNAL_REST_API_CORS_ORIGIN
+              value: 'https://app.<BASE_DOMAIN>,https://profile.<BASE_DOMAIN>'   # CHANGE ME
+            - name: EXTERNAL_REST_API_PUBLIC_BASE_URL
+              value: 'https://api.<BASE_DOMAIN>'                                 # CHANGE ME
+            - name: EXTERNAL_REST_API_DESKTOP_RPC_PROXY_BASE_URL
+              value: 'https://rpc.<BASE_DOMAIN>'                                 # CHANGE ME
+            - name: EXTERNAL_REST_API_DESKTOP_APP_NAME
+              value: '<APP_NAME>'                                                # CHANGE ME

@@ -1,0 +1,110 @@
+# Images that controllers spawn at RUNTIME from env-var values. Kustomize's
+# `images:` block does not rewrite env values, so the full reference is spelled
+# out here and must be bumped together with kustomization.yaml.
+#
+# REGISTRY_PATH and IMAGE_TAG must match kustomization.yaml exactly.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-api
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: control-api
+          env:
+            - name: CONTROL_API_REMOTE_MCP_EGRESS_PROXY_IMAGE
+              value: <REGISTRY_PATH>/nginx-egress-proxy:<IMAGE_TAG>   # CHANGE ME
+            # Plugin Workload SDK activation (control-api + WRC + the recipe
+            # mcp-host WRC injects when on). Keep the three in step.
+            - name: PLUGIN_WORKLOAD_SDK_ENABLED
+              value: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: host-context-controller
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: host-context-controller
+          env:
+            - name: CONTEXT_MAPPER_HOST_IMAGE
+              value: <REGISTRY_PATH>/mcp-host-slim:<IMAGE_TAG>                 # CHANGE ME
+            - name: CONTEXT_MAPPER_EGRESS_PROXY_IMAGE
+              value: <REGISTRY_PATH>/nginx-egress-proxy:<IMAGE_TAG>            # CHANGE ME
+            # gfsc (Global File System controller) — reconciler-spawned by HCC.
+            - name: CONTEXT_MAPPER_GFSC_IMAGE
+              value: <REGISTRY_PATH>/gfs-controller:<IMAGE_TAG>                # CHANGE ME
+            - name: STDIO_BRIDGE_IMAGE
+              value: <REGISTRY_PATH>/stdio-bridge:<IMAGE_TAG>                  # CHANGE ME
+            - name: CONTEXT_MAPPER_STDIO_BRIDGE_IMAGE
+              value: <REGISTRY_PATH>/stdio-bridge:<IMAGE_TAG>                  # CHANGE ME
+            # StorageClass for HCC-created per-Host workspace PVCs (RWO).
+            - name: CONTEXT_MAPPER_HOST_WORKSPACE_STORAGE_CLASS
+              value: <STORAGE_CLASS_RWO>                                       # CHANGE ME  e.g. standard-rwo
+            - name: CONTEXT_MAPPER_HOST_RESOURCES_LIMIT_MEMORY
+              value: '2Gi'
+            - name: CONTEXT_MAPPER_DESKTOP_IMAGE
+              value: <REGISTRY_PATH>/mcp-host-desktop:<IMAGE_TAG>              # CHANGE ME
+            - name: CONTEXT_MAPPER_DESKTOP_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: inter-service-tokens
+                  key: desktop-api-token
+            - name: CONTEXT_MAPPER_CHANNEL_READER_IMAGE
+              value: <REGISTRY_PATH>/channel-reader:<IMAGE_TAG>                # CHANGE ME
+            - name: CONTEXT_MAPPER_WFC_IMAGE
+              value: <REGISTRY_PATH>/workspace-files-controller:<IMAGE_TAG>    # CHANGE ME
+            - name: CONTEXT_MAPPER_WFC_IMAGE_PULL_POLICY
+              value: IfNotPresent
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-recipes
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: workflow-recipes
+          env:
+            - name: CLERUM_COORDINATOR_IMAGE
+              value: <REGISTRY_PATH>/workflow-coordinator:<IMAGE_TAG>          # CHANGE ME
+            - name: CLERUM_MCP_HOST_IMAGE
+              value: <REGISTRY_PATH>/mcp-host-slim:<IMAGE_TAG>                 # CHANGE ME
+            - name: CLERUM_ARTIFACT_READER_IMAGE
+              value: <REGISTRY_PATH>/workflow-recipes:<IMAGE_TAG>              # CHANGE ME
+            - name: CLERUM_SNIPPET_RUNNER_IMAGE
+              value: <REGISTRY_PATH>/workflow-snippet-runner:<IMAGE_TAG>       # CHANGE ME
+            - name: WRC_ENABLE_SNIPPET_RUNTIME
+              value: 'true'
+            - name: PLUGIN_WORKLOAD_SDK_ENABLED
+              value: "true"
+            # Custom coordinator images must come from YOUR registry; digest
+            # enforcement stays on so tag-only custom images are rejected.
+            - name: WRC_ENABLE_CUSTOM_COORDINATOR_IMAGE
+              value: 'true'
+            - name: WRC_ALLOWED_COORDINATOR_IMAGE_PREFIXES
+              value: <REGISTRY_PATH>/                                          # CHANGE ME
+            - name: WRC_REQUIRE_COORDINATOR_IMAGE_DIGEST
+              value: 'true'
+            # NetworkPolicy enforcement posture (base defaults). Keep `required`
+            # and leave CONFIRMED=false until you have PROVEN packet-level denies
+            # on this cluster (see ../04-network-policies-and-cni.md).
+            - name: CLERUM_NETWORK_POLICY_ENFORCEMENT_MODE
+              value: required
+            - name: CLERUM_NETWORK_POLICY_ENFORCEMENT_CONFIRMED
+              value: "false"
+            - name: WRC_WEBHOOK_GATEWAY_IMAGE
+              value: <REGISTRY_PATH>/webhook-gateway:<IMAGE_TAG>               # CHANGE ME
+            # WRC stamps WorkflowRecipe.status.webhooks[].publicUrl =
+            # "${WEBHOOK_PUBLIC_BASE_URL}/api/v1/webhook/<ns>/<recipe>/<id>".
+            # Must be the hostname your ingress routes to webhook-proxy:8095.
+            - name: WEBHOOK_PUBLIC_BASE_URL
+              value: https://webhook.<BASE_DOMAIN>                             # CHANGE ME
