@@ -42,7 +42,7 @@ edit `deploy/base` in place: your changes belong in the overlay.
 Most of what runs on your cluster is defined **upstream**, in the public
 repo, not in this guide. The overlay is a thin layer of environment values on
 top. At `v0.11.0` the base alone renders **250 objects**; your overlay adds
-**2** and patches **27** of them (252 total; 261 with the Cloudflare
+**2** resources and patches the base (252 total; 261 with the Cloudflare
 ingress slice, which adds 9 more upstream objects, two of which the overlay
 also patches).
 
@@ -57,7 +57,7 @@ What the overlay patches in the base:
 
 | Patch group | Base objects touched | Purpose |
 |---|---|---|
-| strategic-merge ConfigMaps | `control-api-config`, `clerum-channel-reader-config`, `codex-llm-proxy-config` (+ `cloudflared-config` with the tunnel) | hostnames, registry mode, allowlists, feature gates |
+| strategic-merge ConfigMaps | `control-api-config`, `clerum-channel-reader-config`, `codex-llm-proxy-config`, `grok-llm-proxy-config` (+ `cloudflared-config` with the tunnel) | hostnames, registry mode, allowlists, feature gates |
 | resources | 9 Deployments (`resource-limits.yaml`) + `nginx-workflow-approval-gateway` | indicative requests/limits |
 | controller env | `host-context-controller` (5 patches), `control-api`, `workflow-recipes`, `external-rest-api` | images embedded in env vars, CIDRs, allowlists, pull-secret names, CORS/public URLs |
 | NetworkPolicy, API server | `allow-k8s-api-egress-{control-plane,mcp-host,channels}` | your cluster's API-server addresses |
@@ -87,13 +87,13 @@ Consequences:
 | File | What it does | Values you must set |
 |---|---|---|
 | `kustomization.yaml` | lists base + overlay resources, the `images:` pins, both patch lists, the `replacements:` block | `<REGISTRY_PATH>`, `<IMAGE_TAG>`; uncomment the three Cloudflare lines only if you use the tunnel |
-| `configmaps/control-api-config.yaml` | strategic-merge over the base `control-api-config`: public origins, OAuth callback, desktop origins, invitation mode (`hosted`), plugin registry (`REGISTRY_CONNECTION_MODE=self-hosted`, `CLERUM_REGISTRY_URL`, also read by WRC), image allowlist, deletes the OSS default DSN | `<BASE_DOMAIN>`, `<APP_NAME>`, `<ENV_NAME>`, `<CLUSTER_NAME>`, `<ZONE>`, `<REGISTRY_PATH>`; keep the two registry keys unless you run your own registry |
+| `configmaps/control-api-config.yaml` | strategic-merge over the base `control-api-config`: public origins, OAuth callback, desktop origins, invitation mode (`hosted`), plugin registry (`REGISTRY_CONNECTION_MODE=self-hosted`, `CLERUM_REGISTRY_URL`, also read by WRC), subscription gates/catalog sync, core pool sizing, image allowlist, deletes the OSS default DSN | `<BASE_DOMAIN>`, `<APP_NAME>`, `<ENV_NAME>`, `<CLUSTER_NAME>`, `<ZONE>`, `<REGISTRY_PATH>`; keep the two registry keys unless you run your own registry |
 | `configmaps/rpc-proxy-config.yaml` | complete ConfigMap (not in base) for the streaming edge | `<BASE_DOMAIN>` (CORS + OAuth callback) |
 | `configmaps/mcp-host-config.yaml` | complete ConfigMap (not in base) for agent pods; JWT key left empty on purpose | none (tune limits if you like) |
 | `configmaps/channel-reader-config.yaml` | adds `CLERUM_PROFILE_UI_URL` to the base ConfigMap | `<BASE_DOMAIN>` |
-| `configmaps/codex-llm-proxy-config.yaml` | subscription proxy gate, `false` | none |
+| `configmaps/codex-llm-proxy-config.yaml`, `configmaps/grok-llm-proxy-config.yaml` | subscription proxy execution gates, `true` | none |
 | `configmaps/cloudflared-config.yaml` | Cloudflare Tunnel routing table (only with `base/ingress`) | `<TUNNEL_UUID>`, `<BASE_DOMAIN>` |
-| `patches/dynamic-images.yaml` | images embedded in env vars of control-api, HCC and WRC; plus the workspace StorageClass, SDK/snippet flags, enforcement mode, webhook public URL | `<REGISTRY_PATH>`, `<IMAGE_TAG>`, `<STORAGE_CLASS_RWO>`, `<BASE_DOMAIN>` |
+| `patches/dynamic-images.yaml` | images embedded in env vars of control-api, HCC and WRC; plus HCC policy resync, workspace StorageClass, SDK/snippet/Grok flags, enforcement mode, webhook public URL | `<REGISTRY_PATH>`, `<IMAGE_TAG>`, `<STORAGE_CLASS_RWO>`, `<BASE_DOMAIN>` |
 | `patches/external-rest-api-cors.yaml` | CORS origins + public base URLs of the REST API | `<BASE_DOMAIN>`, `<APP_NAME>` |
 | `patches/hcc-allowed-image-prefixes.yaml` | HCC's plugin image allowlist | `<REGISTRY_PATH>` |
 | `patches/hcc-k8s-api-cidrs.yaml` | API-server + kube-dns CIDRs HCC writes into generated policies | script-filled |
@@ -101,7 +101,7 @@ Consequences:
 | `patches/k8s-api-ip.yaml`, `-mcp-host.yaml`, `-channels.yaml` | API-server egress ipBlocks for the three statically-policed namespaces | script-filled |
 | `patches/nodelocal-dns-egress-rule.yaml` | kube-dns ClusterIP ipBlock appended to every DNS policy | script-filled |
 | `patches/resource-limits.yaml`, `patches/nginx-workflow-approval-gateway.yaml` | requests/limits | tune to your node pool |
-| `patches/gfs-upload-storage-floor.yaml` | GFS upload geometry, v2 disabled | none |
+| `patches/gfs-upload-storage-floor.yaml` | GFS upload v2 enabled, 200 MiB product limit and chunk/session geometry | none |
 | `patches/storage-class.yaml`, `patches/workflow-output-storageclass.yaml` | StorageClasses for the two base PVCs | `<STORAGE_CLASS_RWO>` |
 | `rbac-e2e-compat.yaml` | optional RoleBinding for your deploy identity, disabled | `<DEPLOY_SA_EMAIL>` |
 | `instances/*.yaml` | first `Host`, `Context`, `GlobalFileSystem`, optional `CommunicationChannel`; applied **separately** | `<LLM_PROVIDER>`, `<LLM_MODEL>`, `<GFS_SIZE>`, `<STORAGE_CLASS_RWO>` |

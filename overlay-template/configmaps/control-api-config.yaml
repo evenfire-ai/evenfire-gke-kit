@@ -18,6 +18,18 @@ data:
   # DB migration gate runs before the overlay is applied and control-api is
   # restarted afterwards so new pods load the flag.
   CONTROL_API_DESKTOP_GFS_OPERATOR_LINKING_ENABLED: "true"
+  # Subscription management and execution admission. Keep these aligned with
+  # the proxy gates, mcp-host-config and WRC_GROK_SUBSCRIPTION_ENABLED.
+  # Operators still connect an account and assign its connectionRef in the UI.
+  CONTROL_API_CODEX_SUBSCRIPTION_ENABLED: "true"
+  CONTROL_API_GROK_SUBSCRIPTION_ENABLED: "true"
+  # Refresh each connected subscription's model catalog every six hours.
+  SUBSCRIPTION_CATALOG_SYNC_CRON_ENABLED: "true"
+  SUBSCRIPTION_CATALOG_SYNC_INTERVAL_MS: "21600000"
+  # Sized for one control-api replica. Recalculate the total Postgres
+  # connection budget before increasing replicas or other service pools.
+  CORE_POOL_MAX: "24"
+  CORE_POOL_CONNECTION_TIMEOUT_MS: "3000"
   # Labels attached to governed traces. Free-form, informational.
   TRACING_ENVIRONMENT: "<ENV_NAME>"            # CHANGE ME  e.g. prod
   TRACING_CLUSTER_NAME: "<CLUSTER_NAME>"       # CHANGE ME

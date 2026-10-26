@@ -33,6 +33,12 @@ spec:
       containers:
         - name: host-context-controller
           env:
+            # Periodically restore controller-owned policies and namespace
+            # defaults; packet-level enforcement still requires the CNI.
+            - name: CONTEXT_MAPPER_NETPOL_RESYNC_SEC
+              value: "3600"
+            - name: CONTEXT_MAPPER_NETPOL_DEFAULTS_RESYNC_SEC
+              value: "300"
             - name: CONTEXT_MAPPER_HOST_IMAGE
               value: <REGISTRY_PATH>/mcp-host-slim:<IMAGE_TAG>                 # CHANGE ME
             - name: CONTEXT_MAPPER_EGRESS_PROXY_IMAGE
@@ -84,6 +90,10 @@ spec:
               value: <REGISTRY_PATH>/workflow-snippet-runner:<IMAGE_TAG>       # CHANGE ME
             - name: WRC_ENABLE_SNIPPET_RUNTIME
               value: 'true'
+            # Grok recipe execution, scope and egress projection. Keep aligned
+            # with the Control API and Grok proxy execution gates.
+            - name: WRC_GROK_SUBSCRIPTION_ENABLED
+              value: "true"
             - name: PLUGIN_WORKLOAD_SDK_ENABLED
               value: "true"
             # Custom coordinator images must come from YOUR registry; digest

@@ -96,6 +96,7 @@ images:
 patchesStrategicMerge:
   - configmaps/control-api-config.yaml
   - configmaps/codex-llm-proxy-config.yaml
+  - configmaps/grok-llm-proxy-config.yaml
   - configmaps/channel-reader-config.yaml
   - patches/resource-limits.yaml
   - patches/gfs-upload-storage-floor.yaml
