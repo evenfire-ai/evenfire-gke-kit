@@ -1,7 +1,5 @@
-# LLM-subscription proxy execution gate. The base default is "false" (the
-# proxy workload runs but refuses execution). Flip to "true" only together with
-# CONTROL_API_CODEX_SUBSCRIPTION_ENABLED / MCP_HOST_CODEX_SUBSCRIPTION_ENABLED
-# and after Evenfire confirms the feature for your deployment.
+# Codex subscription execution gate. The template enables the Control API,
+# proxy and Host gates together; a connected account is still required.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,4 +8,4 @@ metadata:
   labels:
     app: codex-llm-proxy
 data:
-  CODEX_LLM_PROXY_EXECUTION_ENABLED: "false"
+  CODEX_LLM_PROXY_EXECUTION_ENABLED: "true"

@@ -1,7 +1,7 @@
 # Global File System (GFS) upload profile on the host-context-controller,
-# which owns the generated gfsc workload configuration. Upload v2 stays
-# DISABLED here (the conservative production posture); the remaining values
-# pre-stage the v2 geometry so enabling it later is a one-flag change.
+# which owns the generated gfsc workload configuration. Upload v2 is enabled
+# with a 200 MiB product limit and bounded chunk/session geometry. HCC
+# projects this profile into the generated writer and reader workloads.
 # No environment-specific values.
 apiVersion: apps/v1
 kind: Deployment
@@ -15,7 +15,7 @@ spec:
         - name: host-context-controller
           env:
             - name: CONTEXT_MAPPER_GFSC_UPLOAD_V2_ENABLED
-              value: 'false'
+              value: 'true'
             - name: CONTEXT_MAPPER_GFSC_UPLOAD_PROTOCOL_MAX_FILE_BYTES
               value: '1073741824'
             - name: CONTEXT_MAPPER_GFSC_UPLOAD_PRODUCT_MAX_FILE_BYTES

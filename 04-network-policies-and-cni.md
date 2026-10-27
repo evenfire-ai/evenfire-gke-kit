@@ -88,6 +88,16 @@ then a same-version node-pool upgrade (`gcloud container clusters upgrade
 nodes labelled `projectcalico.org/ds-ready=true` so `calico-node` schedules.
 Only then is anything enforced. Expect every pod to bounce once.
 
+## Periodic reconciliation
+
+The template sets `CONTEXT_MAPPER_NETPOL_RESYNC_SEC="3600"` and
+`CONTEXT_MAPPER_NETPOL_DEFAULTS_RESYNC_SEC="300"` on HCC. These enable an
+hourly NetworkPolicy reconciliation and a defaults-only pass every five
+minutes. The public code defaults for both intervals are `0` (disabled).
+HCC can therefore restore its owned policies after drift without waiting for
+a restart. These timers do not enable CNI enforcement or confirm packet-level
+denies: keep the verification and WRC confirmation steps below.
+
 ## Fill the cluster-specific CIDRs
 
 Run the template's script against **your** cluster; it rewrites five files

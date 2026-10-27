@@ -63,7 +63,7 @@ in [08](08-troubleshooting-and-gotchas.md).
 | B8 | JWT key sync — **immediately** (upgrades only) | `GFS_REMOTE_RECONCILE_AUTHORIZED=true ALLOWED_CONTEXTS="$CONTEXT" bash scripts/minikube/sync-auth-key.sh --context "$CONTEXT"`. On a **first install skip this step**: B10 syncs the key before it applies the instances that create the consumers. |
 | B9 | Verify NetworkPolicies | `bash deploy/scripts/verify-networkpolicies.sh --overlay $OVERLAY_NAME --context "$CONTEXT"` |
 | B10 | GFS + instances | `ALLOWED_CONTEXTS="$CONTEXT" bash deploy/scripts/provision-gfs-runtime.sh --context "$CONTEXT" --overlay $OV` — **first install:** run exactly like that (it syncs the auth key into `mcp-host-config` and `gfs-config`, applies `$OV/instances/`, waits for HCC, finalises the gfsc DB credentials, waits for `GlobalFileSystem/gfs` Ready). **Upgrades:** add `--skip-auth-sync` (B8 already did it; this is what Evenfire's CD runs) and optionally `--skip-instances` if you manage instances by hand. `--allow-prod` is an alternative to `ALLOWED_CONTEXTS` for the same context |
-| B11 | Restart ConfigMap consumers | `for d in nginx-workflow-approval-gateway host-context-controller-api-gateway control-api-rpc-gateway codex-llm-proxy control-api; do kubectl --context "$CONTEXT" -n control-plane rollout restart deploy/$d; done; kubectl --context "$CONTEXT" -n channels rollout restart deploy/clerum-workflow-approval-request-reader` — these mount ConfigMaps via subPath or envFrom and do not pick up changes otherwise |
+| B11 | Restart ConfigMap consumers | Run the ordered B11 snippet below: restart the gateways/approval reader, restart and wait for **both subscription proxies**, then restart Control API. ConfigMaps mounted via subPath or envFrom do not update the running process automatically |
 | B12 | Re-apply tokens | `CONTEXT="$CONTEXT" bash deploy/scripts/apply-inter-service-tokens.sh` — the base re-applied a placeholder `webhook-proxy-secrets` value in B7; this restores the real token and rolls the consumers that read tokens at startup |
 | B13 | **Rollout gate** (last; fail-closed) | `CONTEXT="$CONTEXT" RENDER=/tmp/rendered.yaml bash $OV/scripts/rollout-gate.sh` — exit 0 is the only success; semantics below |
 | B14 | NetworkPolicy pre-flight (first install; again after any CNI or control-plane change) | `OVERLAY=$OVERLAY_NAME CONTEXT="$CONTEXT" bash deploy/scripts/np-enforce-preflight.sh`. It exits 1 even when healthy: the expected result is exactly one FAIL, `[3] llm-hooks: no NetworkPolicy allows TCP/UDP 53 ...` (sealed by design), and check [0]'s verdict is meaningless on Dataplane V2. Any other FAIL is real; how to read each line is in [04](04-network-policies-and-cni.md#pre-flight-check-after-the-first-full-deploy) |
@@ -86,6 +86,31 @@ open('/tmp/deploy.yaml','w').write('\n---\n'.join(out) + '\n')
 EOF
 echo "deployable: $(grep -c '^kind:' /tmp/deploy.yaml) of $(grep -c '^kind:' /tmp/rendered.yaml)"
 ```
+
+B11 — run in a Bash subshell so a failed proxy restart or readiness wait
+stops the sequence before Control API is restarted with the enabled gates:
+
+```bash
+(
+  set -euo pipefail
+  : "${CONTEXT:?set CONTEXT to your kube-context}"
+  for d in nginx-workflow-approval-gateway host-context-controller-api-gateway control-api-rpc-gateway; do
+    kubectl --context "$CONTEXT" -n control-plane rollout restart "deployment/$d"
+  done
+  kubectl --context "$CONTEXT" -n channels rollout restart deployment/clerum-workflow-approval-request-reader
+  for d in grok-llm-proxy codex-llm-proxy; do
+    kubectl --context "$CONTEXT" -n control-plane rollout restart "deployment/$d"
+    kubectl --context "$CONTEXT" -n control-plane rollout status "deployment/$d" --timeout=300s
+  done
+  kubectl --context "$CONTEXT" -n control-plane rollout restart deployment/control-api
+)
+```
+
+Do not continue to B12 after a failed B11. The final B13 gate still verifies
+Control API and every other gating Deployment. HCC-owned Host pods load
+`mcp-host-config` when created; this sequence does not restart the Host fleet.
+Verify upgraded Hosts after their per-Host recreation or stateless wake
+([10](10-feature-defaults.md#adopting-the-profile-on-an-existing-install)).
 
 B13 — what [rollout-gate.sh](overlay-template/scripts/rollout-gate.sh) does
 (the semantics of Evenfire's CD gate, derived from the render instead of a
@@ -169,6 +194,8 @@ and apply or the preview lies.
 | C6 | Snapshot: export every generated Secret and ConfigMap in the [06](06-secrets-keys-rbac-crds.md#secret-and-key-inventory) table to your secret manager, as `-o json` and all at the same moment — `control-api-secrets` first, its encryption keys cannot be regenerated ([06](06-secrets-keys-rbac-crds.md#backup)); take a PD snapshot of the Postgres disk |
 | C7 | Prove enforcement, then confirm it to WRC: run the three probes in [04](04-network-policies-and-cni.md#post-apply-verification) (DNS resolves, deny probe prints `BLOCKED`, no HCC API timeouts) on **this** cluster. Only then set `CLERUM_NETWORK_POLICY_ENFORCEMENT_CONFIRMED` to `"true"` in `$OV/patches/dynamic-images.yaml`, re-render and run Phase B as for an upgrade (B6 diff: that env change on `workflow-recipes` plus the expected JWT ConfigMap lines; B7 applies; B8 syncs), and commit. Until then WRC refuses every recipe whose MCP servers declare external egress |
 | C8 | Connect the plugin registry: as an admin, **Control UI -> Marketplace -> Connect**, enter an organization name and contact email. No Evenfire-issued credentials; requires the two registry keys in `configmaps/control-api-config.yaml` (template default) |
+| C9 | Connect a subscription: **Secrets -> LLM Subscriptions**, sign in with ChatGPT or Grok, sync the model catalog, then assign the connection and a model to an agent or recipe. ENV activation does not create a connection ([10](10-feature-defaults.md#connect-subscriptions)) |
+| C10 | Verify EvenDrive: open **Files -> EvenDrive**, list the root folder, upload and download a small file, then upload a multi-chunk file within the 200 MiB product limit. Confirm `GlobalFileSystem/gfs` is `Ready` and the generated writer declares `GFS_UPLOAD_V2_ENABLED=true` ([10](10-feature-defaults.md#evendrive)) |
 
 ## Health checks worth scripting
 

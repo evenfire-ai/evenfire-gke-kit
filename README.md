@@ -114,6 +114,7 @@ What to keep in mind while operating it:
 | 7 | [07-deploy-sequence-and-verification.md](07-deploy-sequence-and-verification.md) | run the install, upgrades and rollback, with verification |
 | 8 | [08-troubleshooting-and-gotchas.md](08-troubleshooting-and-gotchas.md) | diagnose a failing step or pod |
 | 9 | [09-values-checklist.md](09-values-checklist.md) | find every `<PLACEHOLDER>` and how to discover its value |
+| 10 | [10-feature-defaults.md](10-feature-defaults.md) | understand the enabled feature profile, subscription setup, and runtime limits |
 
 ## Conventions
 
@@ -136,7 +137,10 @@ What to keep in mind while operating it:
   **Control UI → Marketplace → Connect** (organization name + contact email).
 - **Upgrades:** move to the new release tag, re-assemble with your unchanged
   overlay, and run the drift checks before Phase B ([07 › Upgrades](07-deploy-sequence-and-verification.md#upgrades)).
-- **Optional features:** the LLM subscription proxies are off by default; ask
-  Evenfire before enabling them.
+- **Feature defaults:** ChatGPT/Grok subscriptions, six-hour subscription
+  catalog refresh, GFS upload v2 and automatic tool presentation are enabled.
+  Connect a subscription and assign it to an agent or recipe before use.
+  Hosts have a 24-hour task ceiling and a 100-tool-call budget. See
+  [10](10-feature-defaults.md) for the ENV map and upgrade checks.
 - **Help:** open an issue in this repository or contact your Evenfire
   representative.

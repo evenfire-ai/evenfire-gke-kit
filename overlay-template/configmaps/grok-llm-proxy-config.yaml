@@ -1,0 +1,11 @@
+# Grok subscription execution gate. Keep aligned with the Control API gate
+# and WRC_GROK_SUBSCRIPTION_ENABLED in patches/dynamic-images.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grok-llm-proxy-config
+  namespace: control-plane
+  labels:
+    app: grok-llm-proxy
+data:
+  GROK_LLM_PROXY_EXECUTION_ENABLED: "true"
