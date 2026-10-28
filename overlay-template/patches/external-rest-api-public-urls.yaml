@@ -1,0 +1,36 @@
+# Public URLs of external-rest-api, the REST API behind the api. hostname.
+# This file is what tells the Desktop App where your platform lives. Do not
+# drop it or any key in it: the base ships loopback defaults
+# (http://127.0.0.1:8091, http://127.0.0.1:8094, http://localhost:3001) that
+# render and deploy without any error, and the first symptom is an end user's
+# Desktop App failing to sign in (guide 03-ingress-and-hostnames.md, "The Desktop App").
+#
+# EXTERNAL_REST_API_PUBLIC_BASE_URL and EXTERNAL_REST_API_DESKTOP_RPC_PROXY_BASE_URL
+# are returned by GET https://api.<BASE_DOMAIN>/api/v1/desktop/environment.
+# That endpoint is the Desktop App's ONLY source for the rpc. URL, and the app
+# rejects the answer unless PUBLIC_BASE_URL is exactly the URL the user typed
+# (same scheme and host, no path). Keep both equal to the CONTROL_API_DESKTOP_*
+# pair in configmaps/control-api-config.yaml: an invited member's app starts
+# from that REST URL.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-rest-api
+  namespace: profiles
+spec:
+  template:
+    spec:
+      containers:
+        - name: external-rest-api
+          env:
+            # Browser origins allowed to call the API (scheme + host, comma-separated).
+            - name: EXTERNAL_REST_API_CORS_ORIGIN
+              value: 'https://app.<BASE_DOMAIN>,https://profile.<BASE_DOMAIN>'   # CHANGE ME
+            # The URL your users type into the Desktop App.
+            - name: EXTERNAL_REST_API_PUBLIC_BASE_URL
+              value: 'https://api.<BASE_DOMAIN>'                                 # CHANGE ME
+            # The rpc. URL the Desktop App discovers and then streams from.
+            - name: EXTERNAL_REST_API_DESKTOP_RPC_PROXY_BASE_URL
+              value: 'https://rpc.<BASE_DOMAIN>'                                 # CHANGE ME
+            - name: EXTERNAL_REST_API_DESKTOP_APP_NAME
+              value: '<APP_NAME>'                                                # CHANGE ME

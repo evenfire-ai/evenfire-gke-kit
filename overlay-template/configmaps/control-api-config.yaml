@@ -1,11 +1,14 @@
 # Overrides for the base `control-api-config` ConfigMap (strategic merge:
 # keys here are added to / replace keys in deploy/base/control-plane/configmaps.yaml).
 #
-# Every https:// value embeds one of your public hostnames. The subdomain roles
-# (app., profile., api., rpc., webhook.) are a convention, not a requirement —
-# keep them consistent across this file, rpc-proxy-config.yaml,
-# channel-reader-config.yaml, patches/external-rest-api-cors.yaml and
-# patches/dynamic-images.yaml (WEBHOOK_PUBLIC_BASE_URL).
+# Every https:// value embeds one of your public hostnames. Keep the role
+# prefixes (app., profile., api., rpc., webhook.): the Desktop App derives
+# profile.<domain> from api.<domain>, and the Control UI derives
+# webhook.<domain> from app.<domain>. Keep the values consistent across this
+# file, rpc-proxy-config.yaml, channel-reader-config.yaml,
+# patches/external-rest-api-public-urls.yaml and patches/dynamic-images.yaml.
+# A key deleted here silently falls back to the base default, which for the
+# URL keys is a loopback address; the value gate in guide 02 rejects that.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -26,8 +29,8 @@ data:
   # Refresh each connected subscription's model catalog every six hours.
   SUBSCRIPTION_CATALOG_SYNC_CRON_ENABLED: "true"
   SUBSCRIPTION_CATALOG_SYNC_INTERVAL_MS: "21600000"
-  # Sized for one control-api replica. Recalculate the total Postgres
-  # connection budget before increasing replicas or other service pools.
+  # Sized for control-api's single replica (required from v0.12.0). Recalculate
+  # the total Postgres connection budget before raising this or other pools.
   CORE_POOL_MAX: "24"
   CORE_POOL_CONNECTION_TIMEOUT_MS: "3000"
   # Labels attached to governed traces. Free-form, informational.
@@ -38,12 +41,18 @@ data:
   CONTROL_API_DESKTOP_PROFILE_UI_BASE_URL: "https://profile.<BASE_DOMAIN>"   # CHANGE ME
   CONTROL_API_CONTROL_UI_BASE_URL: "https://app.<BASE_DOMAIN>"               # CHANGE ME
   CONTROL_API_CONTROL_UI_APP_NAME: "<APP_NAME>"                              # CHANGE ME  e.g. Evenfire
-  # Origins the Desktop App is told to use (sent in invitation flows). The base
-  # defaults are 127.0.0.1 port-forward values; set them to the public API and
-  # RPC origins. Verify with Evenfire if your deployment does not use the
-  # Desktop App.
+  # REQUIRED. Sent with every invitation and password reset. When an invited
+  # member completes setup, the Desktop App is pointed at
+  # CONTROL_API_DESKTOP_EXTERNAL_REST_API_BASE_URL; the base default is the
+  # 127.0.0.1 port-forward value, which points that app at the member's own
+  # machine. It MUST equal EXTERNAL_REST_API_PUBLIC_BASE_URL in
+  # patches/external-rest-api-public-urls.yaml. Set the RPC key to the same
+  # rpc. URL as EXTERNAL_REST_API_DESKTOP_RPC_PROXY_BASE_URL (the app discovers
+  # the RPC URL itself). An invitation keeps the values current when it was
+  # sent: re-send invitations issued before a change.
   CONTROL_API_DESKTOP_EXTERNAL_REST_API_BASE_URL: "https://api.<BASE_DOMAIN>"  # CHANGE ME
   CONTROL_API_DESKTOP_RPC_PROXY_BASE_URL: "https://rpc.<BASE_DOMAIN>"         # CHANGE ME
+  CONTROL_API_DESKTOP_APP_NAME: "<APP_NAME>"                                  # CHANGE ME  e.g. Evenfire
   # Public origin of the OAuth callback (the redirect_uri sent in the token
   # exchange). MUST equal rpc-proxy's RPC_PROXY_OAUTH_CALLBACK_BASE_URL so the
   # authorize and token redirect_uris match. Behind any reverse proxy the

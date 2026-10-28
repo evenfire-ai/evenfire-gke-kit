@@ -21,8 +21,8 @@ CIDR rows for you.
 | `<POOL>` / `<CURRENT>` | node pool and its current GKE version | the node-recreating upgrade when enabling Calico on an existing cluster ([04](04-network-policies-and-cni.md)) | `gcloud container node-pools list --cluster=<CLUSTER_NAME> --zone=<ZONE>` (`NAME`, `NODE_VERSION`) |
 | `<AR_REPO>` | Artifact Registry repository name | AR path | `gcloud artifacts repositories list --location=<REGION>` |
 | `<DEPLOY_SA_EMAIL>` | service account CI deploys with | `rbac-e2e-compat.yaml`, WIF binding | `gcloud iam service-accounts list` |
-| `<BASE_DOMAIN>` | DNS zone for the five public hostnames | all `https://` values ([03](03-ingress-and-hostnames.md) table), cloudflared routes | your DNS; the five names must resolve publicly |
-| `<APP_NAME>` | product name shown to users | `CONTROL_API_CONTROL_UI_APP_NAME`, `EXTERNAL_REST_API_DESKTOP_APP_NAME` | your choice |
+| `<BASE_DOMAIN>` | DNS zone for the five public hostnames | all `https://` values ([03](03-ingress-and-hostnames.md) table — including the four Desktop App URLs in `configmaps/control-api-config.yaml` and `patches/external-rest-api-public-urls.yaml`), cloudflared routes | your DNS; the five names must resolve publicly; keep the `app.`/`profile.`/`api.`/`rpc.`/`webhook.` prefixes ([03](03-ingress-and-hostnames.md#the-five-hostnames)) |
+| `<APP_NAME>` | product name shown to users | `CONTROL_API_CONTROL_UI_APP_NAME`, `CONTROL_API_DESKTOP_APP_NAME`, `EXTERNAL_REST_API_DESKTOP_APP_NAME` | your choice |
 | `<ENV_NAME>` | environment label on traces | `TRACING_ENVIRONMENT` | e.g. `prod` |
 | `<STORAGE_CLASS_RWO>` | ReadWriteOnce StorageClass | `patches/storage-class.yaml`, `patches/workflow-output-storageclass.yaml`, `CONTEXT_MAPPER_HOST_WORKSPACE_STORAGE_CLASS`, `instances/globalfilesystem.yaml` | `kubectl --context "$CONTEXT" get storageclass` — `standard-rwo` on GKE |
 | `<GFS_SIZE>` | Global File System volume size | `instances/globalfilesystem.yaml` | capacity planning (indicative 100–500Gi); expandable later only if the class allows expansion |
@@ -47,12 +47,26 @@ CIDR rows for you.
 ## Final gate
 
 ```bash
-grep -rn '<[A-Z_]*>' deploy/overlays/$OVERLAY_NAME --include='*.yaml'   # nothing
-kubectl kustomize deploy/overlays/$OVERLAY_NAME > /tmp/rendered.yaml
+OV=deploy/overlays/$OVERLAY_NAME
+kubectl kustomize "$OV" > /tmp/rendered.yaml
+# value gate: no placeholder, no base loopback default, every hostname key present
+missing=""
+for k in CONTROL_API_CONTROL_UI_BASE_URL CONTROL_API_DESKTOP_PROFILE_UI_BASE_URL \
+    CONTROL_API_OAUTH_CALLBACK_BASE_URL CONTROL_API_DESKTOP_EXTERNAL_REST_API_BASE_URL \
+    CONTROL_API_DESKTOP_RPC_PROXY_BASE_URL RPC_PROXY_CORS_ORIGIN RPC_PROXY_OAUTH_CALLBACK_BASE_URL \
+    CLERUM_PROFILE_UI_URL EXTERNAL_REST_API_CORS_ORIGIN EXTERNAL_REST_API_PUBLIC_BASE_URL \
+    EXTERNAL_REST_API_DESKTOP_RPC_PROXY_BASE_URL; do
+  grep -qw "$k" /tmp/rendered.yaml || missing="$missing $k"
+done
+if [ -n "$missing" ] || grep -nE '<[A-Z_]+>|127\.0\.0\.1|localhost' /tmp/rendered.yaml \
+   || grep -rnE '<[A-Z_]+>' "$OV/instances"; then
+  echo "FIX the lines above${missing:+; missing hostname keys:$missing}"
+else
+  echo "values ok"
+fi
 grep -nE '(image|value): *clerum/' /tmp/rendered.yaml   # nothing
 # only with base/ingress: the DNS target is silently skipped if left commented,
 # leaving cloudflared unable to resolve its upstreams under enforcement
-OV=deploy/overlays/$OVERLAY_NAME
 if grep -qE '^ *- \.\./\.\./base/ingress' "$OV/kustomization.yaml"; then
   CIDR=$(grep -o 'cidr: [0-9.]*/32' "$OV/patches/nodelocal-dns-egress-rule.yaml" | head -1)
   [ -n "$CIDR" ] && grep -A40 'name: allow-dns-egress-ingress' /tmp/rendered.yaml | grep -q "$CIDR" && echo ok || echo MISSING

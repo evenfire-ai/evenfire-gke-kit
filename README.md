@@ -30,7 +30,7 @@ and you back them up to your secret manager. Details:
 | Outbound HTTPS from the cluster (LLM providers, image registry, Evenfire registration hub; Cloud NAT if nodes are private) | [00](00-prerequisites.md#external-dependencies) |
 | At least one LLM provider API key | [06](06-secrets-keys-rbac-crds.md) |
 | `gcloud`, `kubectl`, `helm`, `git`, `jq`, `openssl`, `python3` + `bcrypt` (or `htpasswd`) | [00](00-prerequisites.md#workstation-tooling) |
-| The platform **release tag** to deploy (e.g. `v0.11.0`), agreed with Evenfire | [02](02-assembly-and-overlay-structure.md) |
+| The platform **release tag** to deploy (e.g. `v0.12.0`), agreed with Evenfire | [02](02-assembly-and-overlay-structure.md) |
 
 Two decisions cannot be deferred: **how you expose the hostnames** ([03](03-ingress-and-hostnames.md))
 and **which NetworkPolicy dataplane** you run ([04](04-network-policies-and-cni.md)).
@@ -41,11 +41,11 @@ and **which NetworkPolicy dataplane** you run ([04](04-network-policies-and-cni.
 |---|---|---|
 | 1 | Create the cluster (private nodes recommended) and confirm NetworkPolicy enforcement is on | [00](00-prerequisites.md), [04](04-network-policies-and-cni.md) |
 | 2 | Clone the public repo at the release tag, copy `overlay-template/` in as your overlay | [02](02-assembly-and-overlay-structure.md#the-assembly-model) |
-| 3 | Fill every placeholder; detect your API-server and DNS addresses with `scripts/detect-k8s-api-ip.sh` | [09](09-values-checklist.md), [04](04-network-policies-and-cni.md#fill-the-cluster-specific-cidrs) |
-| 4 | Render offline and pass the lint gates (no cluster needed) | [02](02-assembly-and-overlay-structure.md#render-and-verify-no-cluster-needed) |
+| 3 | Fill every placeholder — the hostname values are **all required** and must agree with each other (they are what the Desktop App is told); detect your API-server and DNS addresses with `scripts/detect-k8s-api-ip.sh` | [09](09-values-checklist.md), [03](03-ingress-and-hostnames.md#every-value-that-embeds-a-hostname), [04](04-network-policies-and-cni.md#fill-the-cluster-specific-cidrs) |
+| 4 | Render offline and pass the value gate and the lint gates (no cluster needed) | [02](02-assembly-and-overlay-structure.md#render-and-verify-no-cluster-needed) |
 | 5 | **Phase A**, once: namespaces + CRDs, RBAC, keys, tokens, LLM keys | [07](07-deploy-sequence-and-verification.md#phase-a--one-time-bootstrap-admin-identity) |
 | 6 | **Phase B**, every deploy: diff, apply, key sync, NetworkPolicy check, rollout gate | [07](07-deploy-sequence-and-verification.md#phase-b--every-deploy-first-install-and-upgrades) |
-| 7 | **Phase C**, first install: claim the admin account, smoke-test, publish the edge, back up secrets, prove enforcement, connect the plugin registry | [07](07-deploy-sequence-and-verification.md#phase-c--first-install-only-after-b) |
+| 7 | **Phase C**, first install: claim the admin account, smoke-test, publish the edge, check Desktop App discovery, connect a Desktop App, back up secrets, prove enforcement, connect the plugin registry | [07](07-deploy-sequence-and-verification.md#phase-c--first-install-only-after-b) |
 
 Always run the **diff** before the **apply**. Back up `control-api-secrets`
 right after it is generated: its encryption keys cannot be regenerated without
@@ -123,8 +123,9 @@ What to keep in mind while operating it:
   `--context "$CONTEXT"`; several platform scripts fall back to your current
   kubeconfig context when it is empty, so always set it.
 - **Hostnames.** `<BASE_DOMAIN>` is your DNS zone, e.g. `evenfire.example.com`.
-  The five roles (`app.`, `profile.`, `api.`, `rpc.`, `webhook.`) can be
-  renamed, as long as each one is consistent everywhere it appears ([03](03-ingress-and-hostnames.md)).
+  Keep the five role prefixes (`app.`, `profile.`, `api.`, `rpc.`,
+  `webhook.`): the Desktop App and the Control UI derive one hostname from
+  another ([03](03-ingress-and-hostnames.md#the-five-hostnames)).
 - **"verify"** marks behaviour you must confirm on your cluster; the command to
   do so is given next to it.
 - **`clerum`** is the platform's internal name. It appears in the CRD API group

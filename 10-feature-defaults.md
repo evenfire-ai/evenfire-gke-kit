@@ -1,6 +1,6 @@
 # 10 — Feature defaults and adoption
 
-The GKE overlay enables the profile below on the supported `v0.11.0` public
+The GKE overlay enables the profile below on the supported `v0.12.0` public
 base and matching images. These are deployment defaults; connecting accounts,
 assigning models, provisioning storage and confirming NetworkPolicy
 enforcement are still installation steps.
@@ -37,8 +37,9 @@ The two presentation modes are independent. `auto` uses the runtime's tool
 discovery policy; it does not grant access to additional tools or providers.
 The shell, tool and MCP timeouts remain their existing template values.
 
-The core database pool is **per Control API pod** and assumes the template's
-single replica. Before increasing replicas or any pool, include the other
+The core database pool is **per Control API pod** and assumes control-api's
+single replica, which v0.12.0 requires (07, upgrade step 5). Before raising
+any pool, include the other
 Control API pools, WRC, trace maintenance, GFS writer/readers and PostgreSQL
 reserved/maintenance connections in the total connection budget. Raising
 this pool does not make PostgreSQL capacity unlimited.

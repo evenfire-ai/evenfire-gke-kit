@@ -46,8 +46,6 @@ spec:
             # gfsc (Global File System controller) — reconciler-spawned by HCC.
             - name: CONTEXT_MAPPER_GFSC_IMAGE
               value: <REGISTRY_PATH>/gfs-controller:<IMAGE_TAG>                # CHANGE ME
-            - name: STDIO_BRIDGE_IMAGE
-              value: <REGISTRY_PATH>/stdio-bridge:<IMAGE_TAG>                  # CHANGE ME
             - name: CONTEXT_MAPPER_STDIO_BRIDGE_IMAGE
               value: <REGISTRY_PATH>/stdio-bridge:<IMAGE_TAG>                  # CHANGE ME
             # StorageClass for HCC-created per-Host workspace PVCs (RWO).
@@ -113,8 +111,9 @@ spec:
               value: "false"
             - name: WRC_WEBHOOK_GATEWAY_IMAGE
               value: <REGISTRY_PATH>/webhook-gateway:<IMAGE_TAG>               # CHANGE ME
-            # WRC stamps WorkflowRecipe.status.webhooks[].publicUrl =
-            # "${WEBHOOK_PUBLIC_BASE_URL}/api/v1/webhook/<ns>/<recipe>/<id>".
-            # Must be the hostname your ingress routes to webhook-proxy:8095.
+            # Reserved: no platform component reads this in the current
+            # release. Recipe webhook URLs are
+            # https://webhook.<BASE_DOMAIN>/api/v1/webhook/<ns>/<recipe>/<id>.
+            # Set it to the hostname your ingress routes to webhook-proxy:8095.
             - name: WEBHOOK_PUBLIC_BASE_URL
               value: https://webhook.<BASE_DOMAIN>                             # CHANGE ME

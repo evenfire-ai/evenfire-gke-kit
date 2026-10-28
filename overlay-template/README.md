@@ -17,10 +17,11 @@ overlay-template/
 │   └── cloudflared-config.yaml    ONLY with ../../base/ingress (Cloudflare Tunnel routing table)
 ├── patches/
 │   ├── dynamic-images.yaml        runtime images, HCC policy resync, WRC feature gates
-│   ├── external-rest-api-cors.yaml public REST API CORS + public base URLs
+│   ├── external-rest-api-public-urls.yaml  what the Desktop App is told (API + RPC URLs), CORS
 │   ├── hcc-allowed-image-prefixes.yaml  plugin image allowlist (your registry first)
 │   ├── hcc-k8s-api-cidrs.yaml     API-server + kube-dns CIDRs HCC puts in generated policies
 │   ├── hcc-pull-ref-overrides.yaml image pull Secret names for spawned pods (empty on GKE+AR)
+│   ├── hcc-workspace-layout-merge.yaml  Host PVC layout merge switch ("true"; turn off per ../07)
 │   ├── k8s-api-ip.yaml            API-server egress: control-plane
 │   ├── k8s-api-ip-mcp-host.yaml   API-server egress: mcp-host
 │   ├── k8s-api-ip-channels.yaml   API-server egress: channels
@@ -48,7 +49,10 @@ overlay-template/
    `patches/hcc-allowed-image-prefixes.yaml`, `configmaps/control-api-config.yaml`.
 2. Decide hostnames ([../03-ingress-and-hostnames.md](../03-ingress-and-hostnames.md)).
    Replace `<BASE_DOMAIN>` and `<APP_NAME>` in `configmaps/*.yaml`,
-   `patches/external-rest-api-cors.yaml`, `patches/dynamic-images.yaml`.
+   `patches/external-rest-api-public-urls.yaml`, `patches/dynamic-images.yaml`.
+   Keep every hostname key and keep both URL files: a key or file you delete
+   leaves the base's loopback default in place, and the Desktop App is then
+   handed `127.0.0.1` ([../03-ingress-and-hostnames.md › The Desktop App](../03-ingress-and-hostnames.md#the-desktop-app)).
 3. Decide StorageClasses: `<STORAGE_CLASS_RWO>` in `patches/storage-class.yaml`,
    `patches/workflow-output-storageclass.yaml`, `patches/dynamic-images.yaml`,
    `instances/globalfilesystem.yaml` (plus `<GFS_SIZE>`).
@@ -64,11 +68,10 @@ overlay-template/
    `configmaps/cloudflared-config.yaml` and the `allow-dns-egress-ingress`
    patch target in `kustomization.yaml`; fill `<TUNNEL_UUID>`.
 
-Gate before any apply (must print nothing):
-
-```bash
-grep -rn '<[A-Z_]*>' deploy/overlays/<OVERLAY_NAME> --include='*.yaml'
-```
+Gate before any apply: render, then run the **value gate** in
+[../02-assembly-and-overlay-structure.md](../02-assembly-and-overlay-structure.md#render-and-verify-no-cluster-needed).
+It must print `values ok`: no placeholder left, no `127.0.0.1` / `localhost`
+(a base default that survived), and every hostname key present.
 
 An unreplaced CIDR placeholder is not caught by the platform's own
 `verify-networkpolicies.sh` (it forbids a different stale address); HCC does
@@ -83,14 +86,16 @@ still need to be connected and assigned; GFS still needs Phase B provisioning.
 
 ## What was verified
 
-With the public tree assembled at tag `v0.11.0` and every placeholder
+With the public tree assembled at tag `v0.12.0` and every placeholder
 substituted with test values (`<REGISTRY_PATH>=ghcr.io/evenfire-ai`,
-`<IMAGE_TAG>=v0.11.0`, `<BASE_DOMAIN>=example.com`, TEST-NET addresses for
+`<IMAGE_TAG>=v0.12.0`, `<BASE_DOMAIN>=example.com`, TEST-NET addresses for
 the CIDRs, `standard-rwo` for the StorageClass), `kubectl kustomize` rendered
 the overlay in both variants (252 objects without `../../base/ingress`, 261
 with), the public tree's `lint-networkpolicies.sh` and
-`lint-workload-hardening.sh` passed on both renders, and no `clerum/<image>`
-reference survived unrewritten. The detect script and `rollout-gate.sh`
+`lint-workload-hardening.sh` passed on both renders, no `clerum/<image>`
+reference survived unrewritten, and the value gate printed `values ok` (it
+reports the loopback lines when `patches/external-rest-api-public-urls.yaml`
+or the `CONTROL_API_DESKTOP_*` keys are removed). The detect script and `rollout-gate.sh`
 were exercised against a stubbed `kubectl` (the gate: healthy -> exit 0;
 a gating rollout failure, a missing expected Deployment, or a failed
 namespace listing -> exit 1; a non-gating failure alone -> 0).

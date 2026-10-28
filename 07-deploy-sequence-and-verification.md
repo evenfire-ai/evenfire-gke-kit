@@ -47,7 +47,7 @@ in [08](08-troubleshooting-and-gotchas.md).
 | A4b | Inter-service tokens — first run | `CONTROL_API_MEMBER_REGISTRATION_HMAC_SECRET=$(openssl rand -hex 32) CONTEXT="$CONTEXT" bash deploy/scripts/apply-inter-service-tokens.sh` — the only run that carries the env var: without it and without a stored value the script stops with `CONTROL_API_MEMBER_REGISTRATION_HMAC_SECRET is required ...`; with it on a later run it **rotates** the stored value ([06](06-secrets-keys-rbac-crds.md#inter-service-tokens)) |
 | A5 | LLM keys and channel Secret | create `mcp-host/chatllm-api-keys` and, if you use a chat channel, `channels/cc-default-channel-credentials` + the `credentialsSecretRef` line in `instances/communicationchannel.yaml` ([06](06-secrets-keys-rbac-crds.md#channel-credentials)) |
 | A6 | CIDRs | `CONTEXT="$CONTEXT" OVERLAY_DIR=$OV bash $OV/scripts/detect-k8s-api-ip.sh`; commit |
-| A7 | Render gate | `grep -rn '<[A-Z_]*>' $OV --include='*.yaml'` prints nothing; `kubectl kustomize $OV > /tmp/rendered.yaml`; both linters pass ([02](02-assembly-and-overlay-structure.md)) |
+| A7 | Render gate | `kubectl kustomize $OV > /tmp/rendered.yaml`; the value gate prints `values ok` (no placeholder and no `127.0.0.1`/`localhost` left: a loopback address is a hostname value missing from your overlay, [03](03-ingress-and-hostnames.md#every-value-that-embeds-a-hostname)); both linters pass — commands in [02](02-assembly-and-overlay-structure.md#render-and-verify-no-cluster-needed) |
 
 ## Phase B — every deploy (first install and upgrades)
 
@@ -57,7 +57,7 @@ in [08](08-troubleshooting-and-gotchas.md).
 | B2 | DB migration gate | `CONTEXT="$CONTEXT" ALLOWED_CONTEXTS="$CONTEXT" bash deploy/scripts/run-control-api-db-migration.sh --overlay $OV` — applies the Postgres prerequisites from the render (SA, ConfigMap, PVC, Deployment, Service), waits for Postgres, verifies the referenced Secrets exist, runs `node dist/migrate.js` from the **rendered** control-api image as a Job, then asserts the schema and the runtime-role privilege contract |
 | B3 | Runtime DB roles | `CONTEXT="$CONTEXT" ALLOWED_CONTEXTS="$CONTEXT" bash deploy/scripts/provision-control-api-runtime-roles.sh` (idempotent; mandatory on first install, harmless later) |
 | B4 | Recreate-strategy repair | only when upgrading from a release where `control-api`, `control-postgres` or `host-context-controller` were `RollingUpdate`: patch `spec.strategy.rollingUpdate` to null first, or `kubectl diff` exits 2 (see [08](08-troubleshooting-and-gotchas.md)) |
-| B5 | Render + strip RBAC | render to `/tmp/rendered.yaml`; produce `/tmp/deploy.yaml` without `Role/ClusterRole/RoleBinding/ClusterRoleBinding` (snippet below) |
+| B5 | Render + strip RBAC | render to `/tmp/rendered.yaml`; the value gate in [02](02-assembly-and-overlay-structure.md#render-and-verify-no-cluster-needed) prints `values ok` (on every deploy, not only the first); produce `/tmp/deploy.yaml` without `Role/ClusterRole/RoleBinding/ClusterRoleBinding` (snippet below) |
 | B6 | **Diff** | `kubectl --context "$CONTEXT" diff --server-side --force-conflicts --field-manager=clerum-kustomize -f /tmp/deploy.yaml; echo "rc=$?"` — `0` no drift, `1` drift (expected; read it), anything else is a **real error** |
 | B7 | **Apply** | `kubectl --context "$CONTEXT" apply --server-side --force-conflicts --field-manager=clerum-kustomize -f /tmp/deploy.yaml` |
 | B8 | JWT key sync — **immediately** (upgrades only) | `GFS_REMOTE_RECONCILE_AUTHORIZED=true ALLOWED_CONTEXTS="$CONTEXT" bash scripts/minikube/sync-auth-key.sh --context "$CONTEXT"`. On a **first install skip this step**: B10 syncs the key before it applies the instances that create the consumers. |
@@ -186,16 +186,17 @@ and apply or the preview lies.
 | # | Step |
 |---|---|
 | C1 | Claim the admin account over a port-forward ([06](06-secrets-keys-rbac-crds.md)) **before** publishing DNS |
-| C2 | Smoke test through port-forwards: `kubectl --context "$CONTEXT" -n control-plane port-forward svc/control-ui 3000:3000` -> log in at `http://localhost:3000`; `svc/external-rest-api 8091:8091` -> `curl -s localhost:8091/health`; `svc/rpc-proxy 8094:8094` -> `curl -s localhost:8094/health` |
+| C2 | Smoke test through port-forwards: `kubectl --context "$CONTEXT" -n control-plane port-forward svc/control-ui 3000:3000` -> log in at `http://localhost:3000`; `svc/external-rest-api 18091:8091` -> `curl -s localhost:18091/health`; `svc/rpc-proxy 18094:8094` -> `curl -s localhost:18094/health`. The local ports differ on purpose: `127.0.0.1:8091` / `:8094` are the base's loopback defaults, and forwards on them would make a Desktop App on this workstation work against a misconfigured server. Stop the forwards before C5 |
 | C3 | Check the Host: `kubectl --context "$CONTEXT" -n mcp-host get host,deploy,pods` — a Deployment per Host and a `channel-reader-<host>` in `channels` (`0/0` until a `CommunicationChannel` references the Host; that is HCC's doing, not a failure). A Host with `spec.lifecycle.stateless: true` also shows `0/0` and no pod while `status.lifecycle.state` is `suspended` ([01](01-architecture-and-namespaces.md#the-two-controllers)) |
 | C3b | Chat channel, if any: `kubectl --context "$CONTEXT" -n channels get communicationchannel default-channel -o jsonpath='{.spec.credentialsSecretRef.name}'` prints the Secret you created in A5 (or set it now from the Control UI, [06](06-secrets-keys-rbac-crds.md#channel-credentials)); the reader's log shows the Telegram adapter initialising. Without the reference the reader is Ready and silent |
-| C4 | Publish the edge ([03](03-ingress-and-hostnames.md)) and re-test the five hostnames from outside: `curl -sSI https://api.<BASE_DOMAIN>/health` -> 200; `https://app.<BASE_DOMAIN>` -> your SSO or the login page |
-| C5 | Invite a first member from the Control UI (exercises hosted registration) and connect the Desktop App |
+| C4 | Publish the edge ([03](03-ingress-and-hostnames.md)) and re-test the five hostnames from outside: `curl -sSI https://api.<BASE_DOMAIN>/health` -> 200; `curl -sSI https://rpc.<BASE_DOMAIN>/health` -> 200; `https://app.<BASE_DOMAIN>` -> your SSO or the login page; `https://profile.<BASE_DOMAIN>` -> the Profile UI. Then the Desktop App discovery check in [03 › The Desktop App](03-ingress-and-hostnames.md#the-desktop-app) must print `true` |
+| C5 | Invite a first member from the Control UI (exercises hosted registration), then connect the Desktop App from a machine with no port-forwards: enter `https://api.<BASE_DOMAIN>` ([03 › The Desktop App](03-ingress-and-hostnames.md#the-desktop-app)) and sign in. Pass: sign-in succeeds, a chat streams, and the app's **Settings** shows RPC proxy URL `https://rpc.<BASE_DOMAIN>`. A fix after this point needs every connected app to remove and re-add the environment (03, "After correcting a wrong value") |
 | C6 | Snapshot: export every generated Secret and ConfigMap in the [06](06-secrets-keys-rbac-crds.md#secret-and-key-inventory) table to your secret manager, as `-o json` and all at the same moment — `control-api-secrets` first, its encryption keys cannot be regenerated ([06](06-secrets-keys-rbac-crds.md#backup)); take a PD snapshot of the Postgres disk |
 | C7 | Prove enforcement, then confirm it to WRC: run the three probes in [04](04-network-policies-and-cni.md#post-apply-verification) (DNS resolves, deny probe prints `BLOCKED`, no HCC API timeouts) on **this** cluster. Only then set `CLERUM_NETWORK_POLICY_ENFORCEMENT_CONFIRMED` to `"true"` in `$OV/patches/dynamic-images.yaml`, re-render and run Phase B as for an upgrade (B6 diff: that env change on `workflow-recipes` plus the expected JWT ConfigMap lines; B7 applies; B8 syncs), and commit. Until then WRC refuses every recipe whose MCP servers declare external egress |
 | C8 | Connect the plugin registry: as an admin, **Control UI -> Marketplace -> Connect**, enter an organization name and contact email. No Evenfire-issued credentials; requires the two registry keys in `configmaps/control-api-config.yaml` (template default) |
 | C9 | Connect a subscription: **Secrets -> LLM Subscriptions**, sign in with ChatGPT or Grok, sync the model catalog, then assign the connection and a model to an agent or recipe. ENV activation does not create a connection ([10](10-feature-defaults.md#connect-subscriptions)) |
 | C10 | Verify EvenDrive: open **Files -> EvenDrive**, list the root folder, upload and download a small file, then upload a multi-chunk file within the 200 MiB product limit. Confirm `GlobalFileSystem/gfs` is `Ready` and the generated writer declares `GFS_UPLOAD_V2_ENABLED=true` ([10](10-feature-defaults.md#evendrive)) |
+| C11 | Host PVC layout merge switch: an install that started on v0.12.0 or later has no split PVC to merge. Once your first Host runs, `bash deploy/scripts/host-layout-merge.sh verify --context "$CONTEXT"`; on exit 0 with `HOST_LAYOUT_VERIFY=PASS`, set `"false"` in `$OV/patches/hcc-workspace-layout-merge.yaml` and run Phase B (each running Host restarts once). Recommended, not required: it closes the window described in step 7 of [the v0.12.0 upgrade note](#upgrading-from-v0110-to-v0120) |
 
 ## Health checks worth scripting
 
@@ -205,14 +206,25 @@ kubectl --context "$CONTEXT" get pods -A | grep -E 'CreateContainerConfigError|C
 kubectl --context "$CONTEXT" -n gfs get globalfilesystem gfs -o jsonpath='{.status.phase}'   # Ready
 kubectl --context "$CONTEXT" -n mcp-host get cm mcp-host-config -o jsonpath='{.metadata.annotations.clerum\.io/auth-key-applied-sha256}'  # non-empty
 bash deploy/scripts/verify-secrets.sh                      # with CONTEXT exported: every secretKeyRef resolves
+curl -fsS https://api.<BASE_DOMAIN>/api/v1/.well-known/evenfire-mcp-client | jq -r .client_id   # from outside; prints this same URL (remote MCP OAuth)
 ```
 
 ## Upgrades
+
+Before any upgrade, take the C6 snapshot ([06 › Backup](06-secrets-keys-rbac-crds.md#backup)):
+Secrets, ConfigMaps and the Postgres disk. A release can run schema
+migrations, which rolling the images back does not undo. When the upgrade
+note says the release changes Host volumes in place (v0.12.0 does), also take
+a PD snapshot of each Host workspace PVC.
 
 1. Bump the tag ([05](05-images-registry-and-pinning.md)); re-assemble at the new tag
    (fresh public tree + your unchanged overlay), then run the upstream-drift
    checks in [02 › Keeping the overlay honest](02-assembly-and-overlay-structure.md#keeping-the-overlay-honest-over-time)
    (DNS patch targets, overlay-owned ConfigMaps, new Deployments).
+   Also compare your overlay with this kit's template: in your kit clone,
+   `git diff gke-kit-<old> gke-kit-<new> -- overlay-template/` lists every
+   template change since the kit tag you installed from, and the upgrade note
+   below says which ones are required.
 2. A1 (CRDs, re-apply) and A3 (RBAC) again if the release changed them.
 3. Phase B in full. Always read the B6 diff: expect the two JWT ConfigMaps to
    show their key being replaced/blanked (B8 restores them — do not "fix" the
@@ -220,6 +232,128 @@ bash deploy/scripts/verify-secrets.sh                      # with CONTEXT export
 4. HCC rolls out before WRC by itself (`Recreate` + `replicas: 1`); if WRC
    reports `ExternalEgressReady` not fresh during the window, it is waiting
    for HCC to reconcile existing `McpServer`s — it clears on its own.
+
+### Upgrading from v0.11.0 to v0.12.0
+
+v0.12.0 gives every Host one storage layout on its workspace PVC
+(evenfire-ai/evenfire#1111). On v0.10.x and v0.11.x, a Host that ran
+stateless had its PVC split into `state/` (the conversation database) and
+`workspace/` (the agent's files). v0.12.0's HCC renders a
+`workspace-layout-merge` init container that moves a split tree back to the
+PVC root on the Host's next start, once; on any other tree it exits 0 and
+changes nothing. The steps below wrap that; the product reference is
+`docs/deploy/host-pvc-layout-upgrade.md` in the clone.
+
+1. **Inventory Host storage, with v0.11.0 still running.** From the v0.12.0
+   clone (the script is new in this release and needs `jq`):
+
+   ```bash
+   bash deploy/scripts/host-layout-merge.sh inventory --context "$CONTEXT"
+   # expected: exit 0, UPGRADE_BLOCKERS=0 (PRE_825=yes is normal before the upgrade)
+   ```
+
+   It only reads, except for one short-lived Pod per Host PVC (claim mounted
+   read-only, no service-account token, deleted after its log is read).
+   Repair every `WILL_REFUSE_F<n>` line first (*Repairs* in the upstream note)
+   and re-run until `UPGRADE_BLOCKERS=0`: a refused Host stays in
+   `Init:Error` after the upgrade, and B13 fails on it because `mcp-host` is a
+   gating namespace. `WILL_MERGE` and `WILL_SUPERSEDE` need nothing.
+2. **Desktop Hosts: copy their history out first.** A desktop Host
+   (`spec.desktop`) kept its conversation database inside the container,
+   outside the PVC, so the first v0.12.0 rollout loses it. `inventory` prints
+   `DESKTOP_HOSTS=<n>`; for each one, copy `/workspace/state.db*` (the
+   database and its `-wal` / `-shm` files) out of the running Pod with
+   `kubectl --context "$CONTEXT" -n mcp-host cp` before step 5.
+3. **CRDs first (A1), before Phase B.** `mcpservers.clerum.io` gains the
+   optional, immutable `spec.oauth.asProfile` (`entra-v2`, accepted only with
+   a Microsoft Entra ID tenant issuer); `hosts`, `globalfilesystems` and
+   `llmhooks` change descriptions only. No RBAC, ServiceAccount or namespace
+   change: A3 is not needed.
+4. **Overlay changes, all in the template.** Two come with the release.
+   Remove `STDIO_BRIDGE_IMAGE`
+   from the HCC block of `patches/dynamic-images.yaml` (no release reads it
+   and the base no longer sets it; keep `CONTEXT_MAPPER_STDIO_BRIDGE_IMAGE`).
+   Add `patches/hcc-workspace-layout-merge.yaml` with the value `"true"` and
+   list it under `patches:`. **Never set it to `"false"` in the upgrade
+   deploy**: without the init, a split Host starts on an empty database and
+   reports no error.
+
+   The template also changed since `gke-kit-v0.11.0`
+   (`git diff gke-kit-v0.11.0 gke-kit-v0.12.0 -- overlay-template/`):
+   - **Desktop App URLs, required.** `configmaps/control-api-config.yaml`
+     now sets `CONTROL_API_DESKTOP_EXTERNAL_REST_API_BASE_URL`,
+     `CONTROL_API_DESKTOP_RPC_PROXY_BASE_URL` and `CONTROL_API_DESKTOP_APP_NAME`,
+     and `patches/external-rest-api-cors.yaml` is now
+     `patches/external-rest-api-public-urls.yaml` (an overlay that keeps the
+     old file name works unchanged). Any of these keys missing from your
+     overlay hands the Desktop App a `127.0.0.1` URL. The value gate (B5)
+     must print `values ok`. If users already connected with wrong values,
+     follow "After correcting a wrong value" in
+     [03 › The Desktop App](03-ingress-and-hostnames.md#the-desktop-app).
+   - **Feature defaults, optional.** LLM subscriptions (Codex, Grok), GFS
+     upload v2 and the control-api pool size: adopt them as described in
+     [10](10-feature-defaults.md).
+5. **Phase B in full.** B2 applies one schema migration,
+   `workflow_schedules.concurrency_policy` (default `Forbid`); it waits at
+   most 60 s for the table lock, then the Job fails and retries. The B6 diff
+   shows, besides tags and the JWT ConfigMap lines: the base nginx gateways
+   moving from `nginx:1.30.1-alpine` to `nginx:1.30.6-alpine`, a new public
+   route in `profile-control-funnel-nginx` for the OAuth client metadata
+   document ([03](03-ingress-and-hostnames.md)), `webhook-proxy`'s port 9090
+   renamed from `metrics` to `health`, and, on `host-context-controller`,
+   `STDIO_BRIDGE_IMAGE` removed and `CONTEXT_MAPPER_WORKSPACE_LAYOUT_MERGE`
+   added. **Every running Host restarts once** (its pod template gains the
+   init container) and merges on that start; suspended Hosts merge on their
+   next wake. The mcp-host images are larger in this release (fonts for the
+   document tools), so the first pull on each node takes longer. After the
+   upgrade each Host gets one 401 on its control token and renews it; that
+   log line is expected. control-api must stay at one replica with the
+   `Recreate` strategy, as the base sets (the OAuth broker binds tokens to
+   it); the template changes neither.
+6. **Behaviour changes to tell your users about.**
+   - **Scheduled workflow runs no longer overlap.**
+     `spec.triggers.schedule.concurrencyPolicy` was accepted but not enforced
+     before. v0.12.0 enforces its default, `Forbid`: a scheduled tick is
+     skipped while a run of the same recipe is still pending or running.
+     Recipes that relied on overlapping runs must set
+     `concurrencyPolicy: Allow` (`Replace` behaves like `Allow`).
+   - **Chat-generated files are per user** (evenfire-ai/evenfire#931).
+     Files written before v0.12.0 to the shared `<workspace>/outputs` are no
+     longer listed or served. They stay on the Host's PVC, and mcp-host logs
+     how many there are at startup. To give one back to its owner, move it
+     into `<workspace>/users/<key>/.clerum-outputs/` (mode `700`), where
+     `<key>` is `printf 'rpc:%s' "$USER_ID" | shasum -a 256 | cut -c1-16`.
+   - **A user's OAuth token on a Host needs direct access.** Context
+     membership alone no longer grants it: the user must enter that Host
+     directly or through an active team.
+   - **New invitations expire after 7 days**, including desktop and Control
+     Admin invitations and setup resends. Invitations sent before the
+     upgrade keep their expiry.
+7. **After B13: verify, then turn the switch off in a separate deploy.**
+
+   ```bash
+   bash deploy/scripts/host-layout-merge.sh verify --context "$CONTEXT"
+   # turn off only on: exit 0, HOST_LAYOUT_VERIFY=PASS and ORPHAN_SPLIT=0
+   ```
+
+   `HOST_LAYOUT_VERIFY=PRE_825` or a non-zero `template_stale` right after
+   the upgrade means HCC has not reconciled that Host yet (its first full
+   reconcile can take 15–20 min): wait and run `verify` again.
+   `SPLIT` is a Host that has not started since the upgrade (typically a
+   suspended one): wake it once, for example by opening one of its chats, and
+   run `verify` again. `ORPHAN_SPLIT` above 0 is a split PVC whose Host was
+   deleted; a Host created later under that name would reuse the PVC, so
+   delete it or recreate the Host while the switch is still `"true"`.
+   `UNKNOWN`, `UNREADABLE` and `UNVERIFIED` never count as merged. Then set
+   `"false"` in `patches/hcc-workspace-layout-merge.yaml`, re-render and run
+   Phase B; every running Host restarts once more. While the switch is on, the
+   init runs at every Host start, and an agent-created `state/state.db*`
+   entry on a stateful Host can trigger a merge or a refusal; turning it off
+   closes that window.
+8. **Rolling HCC back to v0.11.0:** if the switch is already `"false"`, set
+   it back to `"true"` and deploy that first. The v0.11.0 init re-splits
+   stateless trees, and only a roll-forward with the merge rendered brings
+   them back to the PVC root.
 
 ### Upgrading from v0.10.0 to v0.11.0
 

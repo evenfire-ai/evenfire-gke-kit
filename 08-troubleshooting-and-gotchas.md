@@ -38,6 +38,9 @@ expected failure modes of those components, not observations.
 | `channel-reader-<host>` shows `0/0` | no `CommunicationChannel` references that Host yet; HCC scales the reader to 0 | expected; apply the channel instance |
 | a Host's agent Deployment in `mcp-host` shows `0/0`, no pod | the Host has `spec.lifecycle.stateless: true` and is idle: HCC set `status.lifecycle.state: suspended` and scaled it to 0 ([01](01-architecture-and-namespaces.md#the-two-controllers)) | expected, not a failure; the next request wakes it. `kubectl --context "$CONTEXT" -n mcp-host get host <name> -o jsonpath='{.status.lifecycle}'`. A `0/0` Host **without** the flag is a real problem |
 | a stateless Host never scales to 0 | `StatelessEnableRejected` condition on the Host (a `CommunicationChannel`, `spec.desktop`, or an unsatisfiable SharedFileSystem co-location), or work/activity within the idle window | `kubectl --context "$CONTEXT" -n mcp-host get host <name> -o jsonpath='{.status.conditions}'`; a rejected Host runs as an ordinary `replicas: 1` Host |
+| a Host pod stuck in `Init:Error`, failing init container `workspace-layout-merge` (v0.12.0+) | the merge refused that PVC's tree; the init log names the rule. Every refusal exits before its first move, so the tree is unchanged | do not roll HCC back while it is in this state. Repair from a helper Pod (*Repairs* in `docs/deploy/host-pvc-layout-upgrade.md` in the clone), then run `bash deploy/scripts/host-layout-merge.sh verify --context "$CONTEXT"`. Run `inventory` before the next upgrade to catch these up front ([07](07-deploy-sequence-and-verification.md#upgrading-from-v0110-to-v0120)) |
+| HCC fails at startup: `CONTEXT_MAPPER_WORKSPACE_LAYOUT_MERGE must be 'true' or 'false', got '...'` | a value other than the exact strings in `patches/hcc-workspace-layout-merge.yaml` | set `"true"` or `"false"` and re-apply |
+| a Host's chat history is empty after the layout merge switch was set to `"false"` | its PVC was still split when the switch went off, so no merge ran; `verify` / `inventory` print `FLAG_FALSE_WITH_SPLIT_TREES=<n>` | set the switch back to `"true"` and deploy. If the Host already started with it off, the next start keeps the newer root database and renames the older history to `state.db.superseded-<ts>`; to serve the older one, see *Repairs* in the upstream note |
 | OAuth grants / Marketplace connection / LLM subscription suddenly unreadable, control-api logs `registry_connection_state_unreadable` | `control-api-secrets` was regenerated (`gen-jwt-keys.sh` re-run) or restored from a different backup than the database | restore **only** the two data-encryption keys from your secret-manager backup, re-patch the Postgres password, restart the signing-key consumers and run the JWT sync — the key-scoped procedure in [06](06-secrets-keys-rbac-crds.md#recovery-after-an-accidental-re-run-of-gen-jwt-keyssh). Do not restore the whole backed-up `data:` map (old private keys against the regenerated public halves). Without the backup the records are lost |
 | `calico-node` DaemonSet shows desired 0 after enabling the add-on | nodes not yet recreated with the `ds-ready` label | the node-pool recreation step ([04](04-network-policies-and-cni.md)) |
 
@@ -60,6 +63,23 @@ expected failure modes of those components, not observations.
 | WRC logs `ExternalEgressReady` not fresh / stale | WRC rolled before HCC reconciled existing `McpServer`s | wait; it clears once HCC's pass finishes. On upgrades HCC rolls first by design |
 | invitation emails not sent, hosted mode | UI base URLs are IP literals / single-label, or no egress to the registration hub | real public DNS names + public 443 egress from control-api |
 | a pod needing Workload Identity cannot reach `169.254.169.254` | metadata range is in the public-egress exception list | explicit egress policy for that pod ([04](04-network-policies-and-cni.md)) |
+
+## Desktop App
+
+Start every case with the discovery check in
+[03 › The Desktop App](03-ingress-and-hostnames.md#the-desktop-app). Every fix
+below ends with the three steps under "After correcting a wrong value" there:
+apply, have each user remove and re-add the environment, re-send old
+invitations.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| "Login failed. Check your email and password." with credentials that work in Profile UI | the app could not finish discovery: `EXTERNAL_REST_API_PUBLIC_BASE_URL` is not exactly the URL the user typed (base default `http://127.0.0.1:8091`), or `api.` is not reachable from the user's machine | set it to `https://api.<BASE_DOMAIN>` in `patches/external-rest-api-public-urls.yaml` |
+| Profile UI **Settings → Setup desktop app** shows the API URL `http://127.0.0.1:8091` | `EXTERNAL_REST_API_PUBLIC_BASE_URL` left at the base default (the dialog shows what the discovery endpoint returns) | same |
+| sign-in works, then chats or file transfers fail with connection errors; **Settings** shows an RPC proxy URL on `127.0.0.1` or a wrong host | `EXTERNAL_REST_API_DESKTOP_RPC_PROXY_BASE_URL` was wrong when the app first connected (base default `http://127.0.0.1:8094`), or `rpc.` is not routed | fix the value; the app keeps the old RPC URL until the user removes and re-adds the environment |
+| after **Connect to your team**, an invited member cannot sign in and the app's **Settings** shows External REST API `http://127.0.0.1:8091` | `CONTROL_API_DESKTOP_EXTERNAL_REST_API_BASE_URL` left at the base default in `configmaps/control-api-config.yaml` (the app is set up with the API URL the invitation carried) | set it, and `CONTROL_API_DESKTOP_RPC_PROXY_BASE_URL` with it; apply (B11 restarts control-api); **re-send the invitation**. A member who already connected removes the environment and adds `https://api.<BASE_DOMAIN>` |
+| works on the operator's workstation, fails for everyone else | the operator still has port-forwards on `8091` / `8094`, which answer for the base defaults | stop the forwards and re-test; fix the values above |
+| **Forgot password** or profile settings in the app open the wrong site | the API hostname does not start with `api.`; the app derives `profile.<domain>` from it | keep the role prefixes ([03](03-ingress-and-hostnames.md#the-five-hostnames)) |
 
 ## Operational rules (learned the hard way)
 

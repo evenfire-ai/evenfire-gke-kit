@@ -6,8 +6,9 @@
 # recipe and ../09-values-checklist.md for every placeholder.
 #
 # Placeholders are UPPER_CASE names in angle brackets. Every line marked "CHANGE ME" must be edited
-# before `kubectl kustomize` output is applied. Gate before apply:
-#   grep -rn '<[A-Z_]*>' deploy/overlays/OVERLAY_NAME --include='*.yaml'   # must print nothing
+# before `kubectl kustomize` output is applied. Gate before apply: the value gate in
+# ../02-assembly-and-overlay-structure.md (no placeholder and no 127.0.0.1/localhost
+# left in the render) must print "values ok".
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
@@ -100,7 +101,7 @@ patchesStrategicMerge:
   - configmaps/channel-reader-config.yaml
   - patches/resource-limits.yaml
   - patches/gfs-upload-storage-floor.yaml
-  - patches/external-rest-api-cors.yaml
+  - patches/external-rest-api-public-urls.yaml
   - patches/dynamic-images.yaml
   - patches/nginx-workflow-approval-gateway.yaml
 
@@ -114,6 +115,8 @@ patches:
   - path: patches/hcc-k8s-api-cidrs.yaml
   - path: patches/hcc-pull-ref-overrides.yaml
   - path: patches/hcc-allowed-image-prefixes.yaml
+  # Host PVC layout merge switch; read the file header before changing it.
+  - path: patches/hcc-workspace-layout-merge.yaml
   - path: patches/workflow-output-storageclass.yaml
   # NodeLocal DNSCache: on GKE, DNS egress must also allow the kube-dns Service
   # ClusterIP as an ipBlock (namespace/pod selectors alone are not enough).

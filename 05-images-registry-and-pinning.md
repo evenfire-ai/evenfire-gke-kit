@@ -10,7 +10,7 @@ builds) and published as `ghcr.io/evenfire-ai/<name>:<tag>`.
 | `control-api`, `control-ui`, `external-rest-api`, `profile-ui`, `rpc-proxy`, `mcp-proxy`, `workflow-recipes`, `workflow-snippet-runner`, `workspace-files-controller`, `webhook-proxy`, `channel-reader`, `workflow-approval-request-reader`, `host-context-controller`, `codex-llm-proxy`, `grok-llm-proxy` | static Deployments in base (`trace-maintenance-worker` reuses `control-api`) | `kustomization.yaml` `images:` |
 | `mcp-host-slim` (base says `clerum/mcp-host`; GKE runs the slim variant) | static reference + HCC/WRC env | both |
 | `mcp-host-desktop`, `gfs-controller`, `stdio-bridge`, `workflow-coordinator`, `webhook-gateway`, `nginx-egress-proxy` | **only** env vars on HCC / WRC / control-api (`nginx-egress-proxy`: `CONTEXT_MAPPER_EGRESS_PROXY_IMAGE`, `CONTROL_API_REMOTE_MCP_EGRESS_PROXY_IMAGE`) | `patches/dynamic-images.yaml` (the template's `images:` entry for `nginx-egress-proxy` matches nothing; harmless) |
-| `nginx:1.30.1-alpine`, `postgres:16-alpine` | base gateways, Postgres | base (third-party, Docker Hub) |
+| `nginx:1.30.6-alpine`, `postgres:16-alpine` | base gateways, Postgres | base (third-party, Docker Hub) |
 | `busybox:1.36` | WFC init container HCC spawns: **env only** (`CONTEXT_MAPPER_WFC_INIT_IMAGE`, also HCC's built-in default) | base (third-party, Docker Hub) |
 | `cloudflare/cloudflared@sha256:...` | `base/ingress` | base (digest-pinned) |
 | `airtable-mcp-server`, `playwright-server`, `web-search-mcp`, `mock-*`, `clerum-workflow-base`, `mcp-host`, `mcp-host-full` | not deployed by the overlay (optional MCP servers, build bases, test fixtures) | — |
@@ -121,7 +121,7 @@ ships a custom coordinator image (that list is always enforced, digest-pinned).
 
 ## Pull credentials — supported paths
 
-Two pull paths are supported in v0.11.0, and both need **no pull Secret**:
+Two pull paths are supported in v0.12.0, and both need **no pull Secret**:
 
 | Path | Why it works |
 |---|---|

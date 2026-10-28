@@ -114,7 +114,7 @@ observed usage (`kubectl top pods -A`, Cloud Monitoring).
 | GlobalFileSystem volume | HCC from the `GlobalFileSystem` instance | RWO | `standard-rwo`; size for your data (indicative: 100–500Gi) |
 | per-Host workspace PVCs | HCC (`CONTEXT_MAPPER_HOST_WORKSPACE_STORAGE_CLASS`) | RWO | `standard-rwo` |
 | `clerum-workflow-output` (legacy, 1Gi) | overlay apply | RWO on single node / RWX otherwise | `standard-rwo` or Filestore |
-| optional `SharedFileSystem` PVCs | HCC | RWO (CRD default; RWX / bucket mounts not supported in v0.11.0, [06](06-secrets-keys-rbac-crds.md#sharedfilesystem-storage)) | `<STORAGE_CLASS_RWO>` |
+| optional `SharedFileSystem` PVCs | HCC | RWO (CRD default; RWX / bucket mounts not supported in v0.12.0, [06](06-secrets-keys-rbac-crds.md#sharedfilesystem-storage)) | `<STORAGE_CLASS_RWO>` |
 
 Confirm the classes exist and allow expansion:
 

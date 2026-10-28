@@ -22,7 +22,7 @@ at `vX.Y.Z` reference the images published as `vX.Y.Z`. Mixing a newer base
 with older images (or vice versa) is unsupported.
 
 ```bash
-export RELEASE_TAG=<RELEASE_TAG>        # e.g. v0.11.0 — agree it with Evenfire
+export RELEASE_TAG=<RELEASE_TAG>        # e.g. v0.12.0 — agree it with Evenfire
 export OVERLAY_NAME=<OVERLAY_NAME>      # e.g. gke-prod
 
 git clone --branch "$RELEASE_TAG" --depth 1 https://github.com/evenfire-ai/evenfire.git evenfire
@@ -41,7 +41,7 @@ edit `deploy/base` in place: your changes belong in the overlay.
 
 Most of what runs on your cluster is defined **upstream**, in the public
 repo, not in this guide. The overlay is a thin layer of environment values on
-top. At `v0.11.0` the base alone renders **250 objects**; your overlay adds
+top. At `v0.12.0` the base alone renders **250 objects**; your overlay adds
 **2** resources and patches the base (252 total; 261 with the Cloudflare
 ingress slice, which adds 9 more upstream objects, two of which the overlay
 also patches).
@@ -50,7 +50,7 @@ also patches).
 |---|---|---|---|
 | **Upstream (do not edit)** | every Deployment, Service, ServiceAccount, the 83 NetworkPolicies (the security model), RBAC (Roles/Bindings, ClusterRoles), ValidatingAdmissionPolicies, Namespaces + PodSecurity labels, PriorityClasses, PDB, canary Secrets, default ConfigMaps, the `PublicEgressExceptionSet`, the CRD chart, the deploy scripts | `deploy/base/**`, `deploy/security/**`, `charts/clerum-crds/**`, `deploy/scripts/**`, `scripts/**` at `<RELEASE_TAG>` | Evenfire, by release. You take changes by moving to a new tag. |
 | **Overlay-owned objects** | `rpc-proxy/rpc-proxy-config` and `mcp-host/mcp-host-config` — **complete** ConfigMaps the base references but does not ship (deleting either file breaks rpc-proxy / agent pods); `instances/` (Host, Context, GlobalFileSystem, CommunicationChannel); optional `rbac-e2e-compat.yaml` | your overlay | you. Upstream's reference copies of the two ConfigMaps are `deploy/overlays/minikube/configmaps/` in the public repo: compare against them on every upgrade. |
-| **Overlay patches** | changes that only work while the named base object exists (table below) | your overlay | you, re-checked on every upgrade |
+| **Overlay patches** | changes that only work while the named base object exists (table below). Unlike the two ConfigMaps above, a patch file or key you delete fails **silently**: the base default renders instead, and for every hostname value that default is a loopback address. The value gate below catches it | your overlay | you, re-checked on every upgrade |
 | **Secrets and key material** | everything in [06](06-secrets-keys-rbac-crds.md) | the cluster only (scripts + your secret manager), never git | you |
 
 What the overlay patches in the base:
@@ -59,7 +59,7 @@ What the overlay patches in the base:
 |---|---|---|
 | strategic-merge ConfigMaps | `control-api-config`, `clerum-channel-reader-config`, `codex-llm-proxy-config`, `grok-llm-proxy-config` (+ `cloudflared-config` with the tunnel) | hostnames, registry mode, allowlists, feature gates |
 | resources | 9 Deployments (`resource-limits.yaml`) + `nginx-workflow-approval-gateway` | indicative requests/limits |
-| controller env | `host-context-controller` (5 patches), `control-api`, `workflow-recipes`, `external-rest-api` | images embedded in env vars, CIDRs, allowlists, pull-secret names, CORS/public URLs |
+| controller env | `host-context-controller` (6 patches), `control-api`, `workflow-recipes`, `external-rest-api` | images embedded in env vars, CIDRs, allowlists, pull-secret names, the Host PVC layout merge switch, public URLs (Desktop App discovery, CORS) |
 | NetworkPolicy, API server | `allow-k8s-api-egress-{control-plane,mcp-host,channels}` | your cluster's API-server addresses |
 | NetworkPolicy, DNS | 9 `allow-dns-egress-*` / `sandbox-ui-static-dns-egress` (10 with the tunnel) | your kube-dns ClusterIP (NodeLocal DNSCache) |
 | storage | `control-postgres-data`, `clerum-workflow-output` PVCs | your StorageClass |
@@ -76,6 +76,7 @@ Consequences:
 - **Public docs apply too.** The clone ships `docs/` (e.g.
   `docs/deploy/production.md`, `docs/how-to/connect-to-registry.md`,
   `docs/how-to/connect-telegram.md`, `docs/how-to/member-invitations-self-hosted.md`,
+  `docs/how-to/desktop-setup-and-updates.md`,
   `docs/how-to/password-work-ownership-recovery.md`)
   for product-level topics. For anything GKE-specific — ordering, secrets,
   NetworkPolicy procedure, registry pull paths — **this guide governs** (for
@@ -87,17 +88,18 @@ Consequences:
 | File | What it does | Values you must set |
 |---|---|---|
 | `kustomization.yaml` | lists base + overlay resources, the `images:` pins, both patch lists, the `replacements:` block | `<REGISTRY_PATH>`, `<IMAGE_TAG>`; uncomment the three Cloudflare lines only if you use the tunnel |
-| `configmaps/control-api-config.yaml` | strategic-merge over the base `control-api-config`: public origins, OAuth callback, desktop origins, invitation mode (`hosted`), plugin registry (`REGISTRY_CONNECTION_MODE=self-hosted`, `CLERUM_REGISTRY_URL`, also read by WRC), subscription gates/catalog sync, core pool sizing, image allowlist, deletes the OSS default DSN | `<BASE_DOMAIN>`, `<APP_NAME>`, `<ENV_NAME>`, `<CLUSTER_NAME>`, `<ZONE>`, `<REGISTRY_PATH>`; keep the two registry keys unless you run your own registry |
+| `configmaps/control-api-config.yaml` | strategic-merge over the base `control-api-config`: public origins, OAuth callback, the Desktop App URLs sent with invitations, invitation mode (`hosted`), plugin registry (`REGISTRY_CONNECTION_MODE=self-hosted`, `CLERUM_REGISTRY_URL`, also read by WRC), subscription gates/catalog sync, core pool sizing, image allowlist, deletes the OSS default DSN | `<BASE_DOMAIN>`, `<APP_NAME>`, `<ENV_NAME>`, `<CLUSTER_NAME>`, `<ZONE>`, `<REGISTRY_PATH>`; keep the two registry keys unless you run your own registry |
 | `configmaps/rpc-proxy-config.yaml` | complete ConfigMap (not in base) for the streaming edge | `<BASE_DOMAIN>` (CORS + OAuth callback) |
 | `configmaps/mcp-host-config.yaml` | complete ConfigMap (not in base) for agent pods; JWT key left empty on purpose | none (tune limits if you like) |
 | `configmaps/channel-reader-config.yaml` | adds `CLERUM_PROFILE_UI_URL` to the base ConfigMap | `<BASE_DOMAIN>` |
 | `configmaps/codex-llm-proxy-config.yaml`, `configmaps/grok-llm-proxy-config.yaml` | subscription proxy execution gates, `true` | none |
 | `configmaps/cloudflared-config.yaml` | Cloudflare Tunnel routing table (only with `base/ingress`) | `<TUNNEL_UUID>`, `<BASE_DOMAIN>` |
-| `patches/dynamic-images.yaml` | images embedded in env vars of control-api, HCC and WRC; plus HCC policy resync, workspace StorageClass, SDK/snippet/Grok flags, enforcement mode, webhook public URL | `<REGISTRY_PATH>`, `<IMAGE_TAG>`, `<STORAGE_CLASS_RWO>`, `<BASE_DOMAIN>` |
-| `patches/external-rest-api-cors.yaml` | CORS origins + public base URLs of the REST API | `<BASE_DOMAIN>`, `<APP_NAME>` |
+| `patches/dynamic-images.yaml` | images embedded in env vars of control-api, HCC and WRC; plus HCC policy resync, workspace StorageClass, SDK/snippet/Grok flags, enforcement mode, webhook public URL (reserved) | `<REGISTRY_PATH>`, `<IMAGE_TAG>`, `<STORAGE_CLASS_RWO>`, `<BASE_DOMAIN>` |
+| `patches/external-rest-api-public-urls.yaml` | **what the Desktop App is told**: the API URL users type and the RPC URL the app discovers ([03 › The Desktop App](03-ingress-and-hostnames.md#the-desktop-app)), plus the browser CORS origins. Earlier kit revisions named it `external-rest-api-cors.yaml`; an overlay that still uses that name works unchanged | `<BASE_DOMAIN>`, `<APP_NAME>` |
 | `patches/hcc-allowed-image-prefixes.yaml` | HCC's plugin image allowlist | `<REGISTRY_PATH>` |
 | `patches/hcc-k8s-api-cidrs.yaml` | API-server + kube-dns CIDRs HCC writes into generated policies | script-filled |
 | `patches/hcc-pull-ref-overrides.yaml` | clears HCC's default pull-Secret names for spawned pods (public pulls / GKE node identity are the supported paths, [05](05-images-registry-and-pinning.md)) | none |
+| `patches/hcc-workspace-layout-merge.yaml` | HCC's Host PVC layout merge switch (`CONTEXT_MAPPER_WORKSPACE_LAYOUT_MERGE`), `"true"` | none at install; set `"false"` only by the procedure in [07](07-deploy-sequence-and-verification.md#upgrading-from-v0110-to-v0120) |
 | `patches/k8s-api-ip.yaml`, `-mcp-host.yaml`, `-channels.yaml` | API-server egress ipBlocks for the three statically-policed namespaces | script-filled |
 | `patches/nodelocal-dns-egress-rule.yaml` | kube-dns ClusterIP ipBlock appended to every DNS policy | script-filled |
 | `patches/resource-limits.yaml`, `patches/nginx-workflow-approval-gateway.yaml` | requests/limits | tune to your node pool |
@@ -142,9 +144,31 @@ Consequences:
 cd evenfire
 OV=deploy/overlays/$OVERLAY_NAME
 
-grep -rn '<[A-Z_]*>' "$OV" --include='*.yaml'          # must print nothing (after detect script)
 kubectl kustomize "$OV" > /tmp/rendered.yaml
 grep -c '^kind:' /tmp/rendered.yaml                     # ~250 objects (~260 with base/ingress)
+
+# value gate (after the detect script): must print "values ok". It reads the
+# render, not the overlay files, so placeholders in files you do not render
+# (cloudflared-config.yaml without the tunnel, rbac-e2e-compat.yaml) are not
+# reported; instances/ is applied separately, so it is checked on its own.
+# A hostname value missing from your overlay shows up one of two ways: as a
+# 127.0.0.1 / localhost line (the base default survived) or as a missing key
+# (the base has no value, and the service falls back silently). See 03,
+# "Every value that embeds a hostname".
+missing=""
+for k in CONTROL_API_CONTROL_UI_BASE_URL CONTROL_API_DESKTOP_PROFILE_UI_BASE_URL \
+    CONTROL_API_OAUTH_CALLBACK_BASE_URL CONTROL_API_DESKTOP_EXTERNAL_REST_API_BASE_URL \
+    CONTROL_API_DESKTOP_RPC_PROXY_BASE_URL RPC_PROXY_CORS_ORIGIN RPC_PROXY_OAUTH_CALLBACK_BASE_URL \
+    CLERUM_PROFILE_UI_URL EXTERNAL_REST_API_CORS_ORIGIN EXTERNAL_REST_API_PUBLIC_BASE_URL \
+    EXTERNAL_REST_API_DESKTOP_RPC_PROXY_BASE_URL; do
+  grep -qw "$k" /tmp/rendered.yaml || missing="$missing $k"
+done
+if [ -n "$missing" ] || grep -nE '<[A-Z_]+>|127\.0\.0\.1|localhost' /tmp/rendered.yaml \
+   || grep -rnE '<[A-Z_]+>' "$OV/instances"; then
+  echo "FIX the lines above${missing:+; missing hostname keys:$missing}"
+else
+  echo "values ok"
+fi
 
 # the public tree's own linters, as used by Evenfire's CD
 bash deploy/scripts/lint-networkpolicies.sh --rendered /tmp/rendered.yaml --no-standalone
@@ -166,8 +190,11 @@ What Evenfire verified with this template: with the public tree at the
 release tag the template was written against, and every placeholder replaced
 by test values (`ghcr.io/evenfire-ai`, that tag, `example.com`, TEST-NET
 addresses, `standard-rwo`), both variants (with and without `base/ingress`)
-render — 252 and 261 objects — and both linters pass (83 / 86 NetworkPolicies,
-18 / 19 workloads). No live cluster was involved in that check; the apply
+render — 252 and 261 objects — both linters pass (83 / 86 NetworkPolicies,
+18 / 19 workloads) and the value gate prints `values ok`; with
+`patches/external-rest-api-public-urls.yaml` or the two
+`CONTROL_API_DESKTOP_*` keys removed, it prints the loopback lines instead.
+No live cluster was involved in that check; the apply
 path is validated by the sequence in [07](07-deploy-sequence-and-verification.md).
 
 ## Keeping the overlay honest over time
@@ -208,6 +235,10 @@ path is validated by the sequence in [07](07-deploy-sequence-and-verification.md
   e.g. tracing and progress-interval tuning). The minikube copies also carry
   **dev-only secret placeholders** (desktop token, cookie secrets): never copy
   those into a ConfigMap; real values live in Secrets ([06](06-secrets-keys-rbac-crds.md)).
+  They also carry `localhost` URLs (`RPC_PROXY_CORS_ORIGIN`,
+  `RPC_PROXY_OAUTH_CALLBACK_BASE_URL`); when you port a key, take its name,
+  not its value — the value gate rejects any loopback address that reaches
+  the render.
   Port a key only when the release notes or the service's config say it needs
   a value for your environment.
 

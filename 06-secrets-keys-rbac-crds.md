@@ -145,7 +145,7 @@ the two **data-encryption keys** in `control-api-secrets`. Those encrypt
 records in Postgres (OAuth grants, dynamically registered OAuth clients,
 the Marketplace/registry connection keypair, the hosted-registration
 credential, LLM subscription connections, approval prompt history); with a new key that ciphertext is unreadable, and
-v0.11.0 ships no re-encryption. **Never re-run it on a cluster that has
+v0.12.0 ships no re-encryption. **Never re-run it on a cluster that has
 data.** Rotate individual keys with the per-key procedures under
 [Key rotation](#key-rotation-key-by-key). If `mcp-host-config` does not exist
 yet (first install, before the overlay apply) it prints a warning; the sync
@@ -361,7 +361,7 @@ defaulting to `ReadWriteOnce`: its `workspace-files-controller` is single-replic
 and the consuming agent pods co-locate with it, so the same `<STORAGE_CLASS_RWO>`
 class as everything else works. ReadWriteMany classes and bucket-backed
 mounts (GKE's Cloud Storage FUSE CSI driver needs a static PV and a pod
-annotation HCC does not set) are **not supported in v0.11.0**. Nothing in
+annotation HCC does not set) are **not supported in v0.12.0**. Nothing in
 the platform needs Workload Identity.
 
 ## Backup
@@ -477,7 +477,7 @@ GFS_REMOTE_RECONCILE_AUTHORIZED=true ALLOWED_CONTEXTS="$CONTEXT" bash scripts/mi
 For a ConfigMap half use `{"data": {...}}` instead of `stringData`.
 
 **Data-encryption keys — do not rotate.** Both live in `control-api-secrets`
-and v0.11.0 ships no re-encryption or dual-key read:
+and v0.12.0 ships no re-encryption or dual-key read:
 
 | Key | Encrypts | Rotating it means |
 |---|---|---|

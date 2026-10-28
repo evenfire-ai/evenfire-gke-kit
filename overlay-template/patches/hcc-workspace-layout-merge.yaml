@@ -1,0 +1,32 @@
+# Host PVC layout merge switch (v0.12.0+, evenfire-ai/evenfire#1111).
+#
+# While "true", HCC renders the `workspace-layout-merge` init container on every
+# Host: on a PVC that v0.10.x / v0.11.x split into `state/` + `workspace/` (a
+# Host that ran stateless) it moves the tree back to the PVC root, once; on any
+# other tree it exits 0 and changes nothing. The code default is "true" too;
+# the value is pinned here so turning it off is a visible overlay change.
+#
+# Upgrading from v0.11.0 or older: keep "true" for the upgrade deploy. NEVER
+# "false" in that deploy: without the init, a split Host starts on an empty
+# database and reports no error. Turn it off in a later, separate deploy, only
+# after `deploy/scripts/host-layout-merge.sh verify` prints
+# HOST_LAYOUT_VERIFY=PASS and ORPHAN_SPLIT=0
+# (../07-deploy-sequence-and-verification.md, upgrade notes).
+#
+# Only the exact strings "true" and "false" are accepted; anything else stops
+# HCC at startup. Changing the value changes every Host's pod template, so each
+# running Host restarts once. Before rolling HCC back to v0.11.0 or older, set
+# it back to "true" and deploy first.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: host-context-controller
+  namespace: control-plane
+spec:
+  template:
+    spec:
+      containers:
+        - name: host-context-controller
+          env:
+            - name: CONTEXT_MAPPER_WORKSPACE_LAYOUT_MERGE
+              value: "true"
