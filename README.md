@@ -47,6 +47,10 @@ and **which NetworkPolicy dataplane** you run ([04](04-network-policies-and-cni.
 | 6 | **Phase B**, every deploy: diff, apply, key sync, NetworkPolicy check, rollout gate | [07](07-deploy-sequence-and-verification.md#phase-b--every-deploy-first-install-and-upgrades) |
 | 7 | **Phase C**, first install: claim the admin account, smoke-test, publish the edge, check Desktop App discovery, connect a Desktop App, back up secrets, prove enforcement, connect the plugin registry | [07](07-deploy-sequence-and-verification.md#phase-c--first-install-only-after-b) |
 
+**Already running Evenfire?** Start at [11 › Upgrading an existing install](11-upgrades.md):
+find the release your cluster runs, then follow the notes up to the target,
+including a single-deploy path from v0.10.0 to v0.12.0.
+
 Always run the **diff** before the **apply**. Back up `control-api-secrets`
 right after it is generated: its encryption keys cannot be regenerated without
 losing stored credentials ([06](06-secrets-keys-rbac-crds.md#backup)).
@@ -111,10 +115,11 @@ What to keep in mind while operating it:
 | 4 | [04-network-policies-and-cni.md](04-network-policies-and-cni.md) | pick and verify the dataplane, fill CIDRs, prove enforcement |
 | 5 | [05-images-registry-and-pinning.md](05-images-registry-and-pinning.md) | choose where images are pulled from and bump versions |
 | 6 | [06-secrets-keys-rbac-crds.md](06-secrets-keys-rbac-crds.md) | create, back up and rotate every Secret and key; RBAC and CRDs |
-| 7 | [07-deploy-sequence-and-verification.md](07-deploy-sequence-and-verification.md) | run the install, upgrades and rollback, with verification |
+| 7 | [07-deploy-sequence-and-verification.md](07-deploy-sequence-and-verification.md) | run the install and rollback, with verification |
 | 8 | [08-troubleshooting-and-gotchas.md](08-troubleshooting-and-gotchas.md) | diagnose a failing step or pod |
 | 9 | [09-values-checklist.md](09-values-checklist.md) | find every `<PLACEHOLDER>` and how to discover its value |
 | 10 | [10-feature-defaults.md](10-feature-defaults.md) | understand the enabled feature profile, subscription setup, and runtime limits |
+| 11 | [11-upgrades.md](11-upgrades.md) | upgrade a running install, one release or several at once |
 
 ## Conventions
 
@@ -136,8 +141,8 @@ What to keep in mind while operating it:
 
 - **Plugin registry:** no credentials to request. An admin connects from
   **Control UI → Marketplace → Connect** (organization name + contact email).
-- **Upgrades:** move to the new release tag, re-assemble with your unchanged
-  overlay, and run the drift checks before Phase B ([07 › Upgrades](07-deploy-sequence-and-verification.md#upgrades)).
+- **Upgrades:** follow [11](11-upgrades.md). It covers backing up, the
+  template changes your overlay needs, and every release's notes.
 - **Feature defaults:** ChatGPT/Grok subscriptions, six-hour subscription
   catalog refresh, GFS upload v2 and automatic tool presentation are enabled.
   Connect a subscription and assign it to an agent or recipe before use.

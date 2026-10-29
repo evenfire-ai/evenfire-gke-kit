@@ -38,7 +38,7 @@ discovery policy; it does not grant access to additional tools or providers.
 The shell, tool and MCP timeouts remain their existing template values.
 
 The core database pool is **per Control API pod** and assumes control-api's
-single replica, which v0.12.0 requires (07, upgrade step 5). Before raising
+single replica, which v0.12.0 requires ([11](11-upgrades.md#upgrading-from-v0110-to-v0120), step 5). Before raising
 any pool, include the other
 Control API pools, WRC, trace maintenance, GFS writer/readers and PostgreSQL
 reserved/maintenance connections in the total connection budget. Raising

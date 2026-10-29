@@ -99,7 +99,7 @@ Consequences:
 | `patches/hcc-allowed-image-prefixes.yaml` | HCC's plugin image allowlist | `<REGISTRY_PATH>` |
 | `patches/hcc-k8s-api-cidrs.yaml` | API-server + kube-dns CIDRs HCC writes into generated policies | script-filled |
 | `patches/hcc-pull-ref-overrides.yaml` | clears HCC's default pull-Secret names for spawned pods (public pulls / GKE node identity are the supported paths, [05](05-images-registry-and-pinning.md)) | none |
-| `patches/hcc-workspace-layout-merge.yaml` | HCC's Host PVC layout merge switch (`CONTEXT_MAPPER_WORKSPACE_LAYOUT_MERGE`), `"true"` | none at install; set `"false"` only by the procedure in [07](07-deploy-sequence-and-verification.md#upgrading-from-v0110-to-v0120) |
+| `patches/hcc-workspace-layout-merge.yaml` | HCC's Host PVC layout merge switch (`CONTEXT_MAPPER_WORKSPACE_LAYOUT_MERGE`), `"true"` | none at install; set `"false"` only by the procedure in [11](11-upgrades.md#upgrading-from-v0110-to-v0120) |
 | `patches/k8s-api-ip.yaml`, `-mcp-host.yaml`, `-channels.yaml` | API-server egress ipBlocks for the three statically-policed namespaces | script-filled |
 | `patches/nodelocal-dns-egress-rule.yaml` | kube-dns ClusterIP ipBlock appended to every DNS policy | script-filled |
 | `patches/resource-limits.yaml`, `patches/nginx-workflow-approval-gateway.yaml` | requests/limits | tune to your node pool |

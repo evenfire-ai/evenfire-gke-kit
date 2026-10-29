@@ -13,5 +13,6 @@ redistribute it outside your organisation without Evenfire's written consent.
 | Sizing | indicative starting points, not requirements |
 | Questions and issues | open an issue in this repository, or contact your Evenfire representative |
 
-Updates are published as new `gke-kit-vX.Y.Z` tags. Before upgrading, read the
-upgrade checks in [02 › Keeping the overlay honest](02-assembly-and-overlay-structure.md#keeping-the-overlay-honest-over-time).
+Each platform release is published as a new `gke-kit-vX.Y.Z` tag. Guide
+corrections between releases land on `main` without a new tag. To upgrade a
+running install, start at [11-upgrades.md](11-upgrades.md).
