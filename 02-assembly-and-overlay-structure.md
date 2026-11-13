@@ -22,7 +22,7 @@ at `vX.Y.Z` reference the images published as `vX.Y.Z`. Mixing a newer base
 with older images (or vice versa) is unsupported.
 
 ```bash
-export RELEASE_TAG=<RELEASE_TAG>        # e.g. v0.12.0 — agree it with Evenfire
+export RELEASE_TAG=<RELEASE_TAG>        # e.g. v0.12.1 — agree it with Evenfire
 export OVERLAY_NAME=<OVERLAY_NAME>      # e.g. gke-prod
 
 git clone --branch "$RELEASE_TAG" --depth 1 https://github.com/evenfire-ai/evenfire.git evenfire

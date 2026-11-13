@@ -18,13 +18,13 @@ Then read the notes below for every release after yours, up to the target.
 ## Skipping releases
 
 You can move more than one release in a single upgrade: a v0.10.x cluster can
-go straight to v0.12.0. Apply the notes of **every** release in between,
+go straight to v0.12.1. Apply the notes of **every** release in between,
 oldest first, as one change:
 
 - **CRDs:** apply them once, from the target release. They include every
   earlier change.
 - **Overlay:** compare from the kit tag you installed from to the target,
-  for example `git diff gke-kit-v0.10.0 gke-kit-v0.12.0 -- overlay-template/`,
+  for example `git diff gke-kit-v0.10.0 gke-kit-v0.12.1 -- overlay-template/`,
   and make every change the notes mark as required.
 - **Phase B:** once, at the target release. B2 applies every schema migration
   in between.
@@ -32,7 +32,8 @@ oldest first, as one change:
   apply.
 
 [From v0.10.0 to v0.12.0 in one deploy](#from-v0100-to-v0120-in-one-deploy)
-puts the two notes together.
+puts the v0.11.0 and v0.12.0 notes together; v0.12.1 adds nothing to it, so
+set the image tag to `v0.12.1` for that deploy ([v0.12.0 to v0.12.1](#upgrading-from-v0120-to-v0121)).
 
 ## Every upgrade
 
@@ -107,6 +108,29 @@ note it comes from.
    [07 › Rollback](07-deploy-sequence-and-verification.md#rollback).
 
 ## Release notes, newest first
+
+### Upgrading from v0.12.0 to v0.12.1
+
+v0.12.1 is a security patch release and an image-only upgrade.
+
+- **What changed:** `control-ui` and `profile-ui` move Next.js 16.3.5 to
+  16.4.6 for CVE-2026-126187 ([GHSA-xqc2-xf4c-x3h3](https://github.com/advisories/GHSA-xqc2-xf4c-x3h3),
+  a critical React Server Components remote-code-execution advisory).
+  `external-rest-api` is rebuilt only because it reports the release version.
+  The other 27 images are byte-identical to v0.12.0.
+- **Do:** set the image tag to `v0.12.1` (the overlay uses one `<IMAGE_TAG>`
+  for every image) and follow the usual path in
+  [Every upgrade](#every-upgrade) and [05 › Bumping a release](05-images-registry-and-pinning.md#bumping-a-release).
+  Re-assemble at the `v0.12.1` tag.
+- **Expect:** three pods restart, `control-ui`, `profile-ui` and
+  `external-rest-api`.
+- **Not needed:** no CRD, database migration, RBAC or overlay-template
+  change that affects a rendered manifest (`git diff gke-kit-v0.12.0 gke-kit-v0.12.1 -- overlay-template/`
+  shows only a comment in `patches/hcc-workspace-layout-merge.yaml`), so A1
+  and A3 can be skipped. Desktop 0.12.1 is a version-only
+  rebuild.
+- **Security:** upgrade every v0.12.0 install. See the
+  [v0.12.1 release notes](https://github.com/evenfire-ai/evenfire/releases/tag/v0.12.1).
 
 ### Upgrading from v0.11.0 to v0.12.0
 
