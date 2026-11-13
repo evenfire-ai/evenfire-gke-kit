@@ -30,7 +30,7 @@ and you back them up to your secret manager. Details:
 | Outbound HTTPS from the cluster (LLM providers, image registry, Evenfire registration hub; Cloud NAT if nodes are private) | [00](00-prerequisites.md#external-dependencies) |
 | At least one LLM provider API key | [06](06-secrets-keys-rbac-crds.md) |
 | `gcloud`, `kubectl`, `helm`, `git`, `jq`, `openssl`, `python3` + `bcrypt` (or `htpasswd`) | [00](00-prerequisites.md#workstation-tooling) |
-| The platform **release tag** to deploy (e.g. `v0.12.0`), agreed with Evenfire | [02](02-assembly-and-overlay-structure.md) |
+| The platform **release tag** to deploy (e.g. `v0.12.1`), agreed with Evenfire | [02](02-assembly-and-overlay-structure.md) |
 
 Two decisions cannot be deferred: **how you expose the hostnames** ([03](03-ingress-and-hostnames.md))
 and **which NetworkPolicy dataplane** you run ([04](04-network-policies-and-cni.md)).
@@ -49,7 +49,7 @@ and **which NetworkPolicy dataplane** you run ([04](04-network-policies-and-cni.
 
 **Already running Evenfire?** Start at [11 › Upgrading an existing install](11-upgrades.md):
 find the release your cluster runs, then follow the notes up to the target,
-including a single-deploy path from v0.10.0 to v0.12.0.
+including a single-deploy path from v0.10.0 to v0.12.1.
 
 Always run the **diff** before the **apply**. Back up `control-api-secrets`
 right after it is generated: its encryption keys cannot be regenerated without
